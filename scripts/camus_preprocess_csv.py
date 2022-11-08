@@ -38,6 +38,8 @@ if __name__ == '__main__':
             AP2_ED = int(AP2_info[0].split(' ')[1])  # extract ED frame into int
             AP2_ES = int(AP2_info[1].split(' ')[1])  # extract ES frame into int
             AP2_totalFrames = int(AP2_info[2].split(' ')[1])  # extract number of frames into int
+            AP2_EDV = float(AP2_info[6].split(' ')[1])  # extract EDV into float
+            AP2_ESV = float(AP2_info[7].split(' ')[1])  # extract ESV into float
             AP2_EF = float(AP2_info[8].split(' ')[1])  # extract EF into float
         else:
             #print(patient + ': No Info_2CH')
@@ -52,6 +54,8 @@ if __name__ == '__main__':
             AP4_ED = int(AP4_info[0].split(' ')[1])  # extract ED frame into int
             AP4_ES = int(AP4_info[1].split(' ')[1])  # extract ES frame into int
             AP4_totalFrames = int(AP4_info[2].split(' ')[1])  # extract number of frames into int
+            AP4_EDV = float(AP4_info[6].split(' ')[1])  # extract EDV into float
+            AP4_ESV = float(AP4_info[7].split(' ')[1])  # extract ESV into float
             AP4_EF = float(AP4_info[8].split(' ')[1])  # extract EF into float
         else:
             #print(patient + ': No Info_4CH')
@@ -62,14 +66,14 @@ if __name__ == '__main__':
             assert AP2_EF == AP4_EF
 
             # enter patient row information
-            patient_row = [patient, AP2_ED, AP2_ES, AP2_totalFrames,
-                           AP4_ED, AP4_ES, AP4_totalFrames, AP4_EF]
+            patient_row = [patient, AP2_ED, AP2_EDV, AP2_ES, AP2_ESV, AP2_totalFrames,
+                           AP4_ED, AP4_EDV, AP4_ES, AP4_ESV, AP4_totalFrames, AP4_EF]
             dataset_table.append(patient_row)
 
     # create and populate dataframe
     data_pd = pd.DataFrame(dataset_table)
-    data_pd.columns = ['PatientID', 'AP2_ED_frame', 'AP2_ES_frame', 'AP2_total_frames',
-                       'AP4_ED_frame', 'AP4_ES_frame', 'AP4_total_frames', 'EF']
+    data_pd.columns = ['PatientID', 'AP2_ED_frame', 'AP2_EDV', 'AP2_ES_frame', 'AP2_ESV', 'AP2_total_frames',
+                       'AP4_ED_frame', 'AP4_EDV', 'AP4_ES_frame', 'AP4_ESV', 'AP4_total_frames', 'EF']
 
     # Save as .csv
-    data_pd.to_csv('CAMUS_extracted_train.csv', index=False)
+    data_pd.to_csv('CAMUS_extracted.csv', index=False)
