@@ -1,6 +1,7 @@
 import SimpleITK as sitk
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
 
 """
 This file contains utility functions to read .mhd/.raw cine files in the CAMUS dataset.
@@ -49,3 +50,58 @@ def display_frame(frame):
     :param frame: [cine, spacing] array; output from load_cine(), must be an ES/ED frame (_Ex) or a ground truth (_Ex_gt)
     """
     plt.imshow(frame[0], cmap='gray')
+
+
+def load_image(filepath: str):
+    """
+    Load each image as SimpleITK.Image file given the path to the image/sequence
+    :param filepath: the filepath to the image file. Makre sure it has a .mhd suffix
+    """
+    image = sitk.ReadImage(filepath, sitk.sitkVectorUInt8)
+    return image
+
+
+def write_video_data(image, output_name, reslice_axis=2, fps=None):
+    """
+    Create a video clip scrolling through a 3D image along a specific axis and
+    write the result to disk. The result can be either the individual frames
+    or a video clip. The later depends on OpenCV which is not installed by
+    default. The former needs to be assembled into a video using an external tool
+    (e.g. ffmpeg).
+    Args:
+        image (SimpleITK.Image): 3D input image.
+                                    NOTE: Pixel spacings in the non-scrolling axes
+                                        are expected to be the same (isotropic in
+                                        that plane). Use the make_isotropic function
+                                        if they aren't.
+                                        Pixel type is either sitkUInt8 or sitkVectorUInt8
+                                        with three components which are assumed to be RGB.
+        output_name (str): A file name prefix. If the frames-per-second parameter is None then this is
+                            used as the prefix for saving individual frames in png format. Otherwise,
+                            this is used as the prefix for saving the video in mp4 format.
+        reslice_axis (int): Number in [0,1,2]. The axis along which we scroll.
+        fps (int): Frames per second.
+    """
+    # Frames are always along the third axis, so set the axis of interest to be the
+    # third axis via PermuteAxes
+    permute_axes = [0, 1, 2]
+    permute_axes[2] = reslice_axis
+    permute_axes[reslice_axis] = 2
+    image = sitk.PermuteAxes(image, permute_axes)
+    print(image.GetDepth())
+
+    if fps is None:  # write slices as individual frames
+        sitk.WriteImage(
+            image, [f"{output_name}{i:03d}.png" for i in range(image.GetDepth())]
+        )
+    else:  # use OpenCV to write slices as mp4 video
+        video_writer = cv2.VideoWriter(
+            filename=output_name + ".mp4",
+            fourcc=cv2.VideoWriter_fourcc("m", "p", "4", "v"),
+            fps=fps,
+            frameSize=image.GetSize()[0:2],
+            isColor=image.GetNumberOfComponentsPerPixel() == 3,
+        )
+        for i in range(image.GetDepth()):
+            video_writer.write(sitk.GetArrayViewFromImage(image[:, :, i]))
+        video_writer.release()
