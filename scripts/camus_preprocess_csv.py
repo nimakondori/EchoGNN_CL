@@ -1,11 +1,13 @@
 import pandas as pd
+import numpy as np
+import random
 import os
 import argparse
 
 """
 This script extracts and consolidates the numerical data (AP2 ED frame, AP2 ES frame, AP2 total number of frames, AP4 ED
-frame, AP4 ES frame, AP4 total number of frames, and EF) from the CAMUS dataset folder (training or testing) into one
-.csv file, 'CAMUS_extracted_train.csv'.
+frame, AP4 ES frame, AP4 total number of frames, and EF) from the CAMUS training dataset folder into one .csv file and
+splits the patients into 360 training (TRAIN), 40 validation (VAL), and 50 test (TEST) samples.
 
 To run: python camus_preprocess_csv.py --dataset_path <path_to_CAMUS_dataset_folder>
 """
@@ -16,20 +18,20 @@ if __name__ == '__main__':
                         help="Path to the folder containing the CAMUS dataset")
     args = parser.parse_args()
 
-    # input path to CAMUS training data
+    # Input path to CAMUS training data
     dataset_path = args.dataset_path
 
-    # create table for data
+    # Create table for data
     dataset_table = []
 
-    # iterate through list of patients
+    # Iterate through list of patients
     patient_list = os.listdir(dataset_path)
 
     for patient in patient_list:
         patient_path = dataset_path + '/' + patient
         patient_files = os.listdir(patient_path)
 
-        # extract AP2 information
+        # Extract AP2 information
         patient_path_AP2 = patient_path + '/Info_2CH.cfg'
         if 'Info_2CH.cfg' in patient_files:
             AP2 = True
@@ -45,7 +47,7 @@ if __name__ == '__main__':
             #print(patient + ': No Info_2CH')
             AP2 = False
 
-        # extract AP4 information
+        # Extract AP4 information
         patient_path_AP4 = patient_path + '/Info_4CH.cfg'
         if 'Info_4CH.cfg' in patient_files:
             AP4 = True
@@ -70,10 +72,17 @@ if __name__ == '__main__':
                            AP4_ED, AP4_EDV, AP4_ES, AP4_ESV, AP4_totalFrames, AP4_EF]
             dataset_table.append(patient_row)
 
-    # create and populate dataframe
+    # Create and populate dataframe
     data_pd = pd.DataFrame(dataset_table)
     data_pd.columns = ['PatientID', 'AP2_ED_frame', 'AP2_EDV', 'AP2_ES_frame', 'AP2_ESV', 'AP2_total_frames',
                        'AP4_ED_frame', 'AP4_EDV', 'AP4_ES_frame', 'AP4_ESV', 'AP4_total_frames', 'EF']
 
-    # Save as .csv
+    # Create split column
+    split = np.concatenate((np.full(shape=360, fill_value='TRAIN'), np.full(shape=40, fill_value='VAL'),
+                            np.full(shape=50, fill_value='TEST')), axis=0)
+    random.seed(50)
+    random.shuffle(split)
+    data_pd['Split'] = split
+
+    # Save as .csv file
     data_pd.to_csv('CAMUS_extracted.csv', index=False)
