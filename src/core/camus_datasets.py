@@ -47,13 +47,13 @@ class CamusDataset(Dataset, ABC):
 
     def __init__(self,
                  dataset_path: str,
-                 num_frames: int = 32, # TODO** must this be static?
-                 num_clips_per_vid: int = 1,
+                 num_frames: int = 42, # corresponds to the largest number of frames in a single video
+                 num_clips_per_vid: int = 1, # using only 1 clip (with zero-padding if necessary)
                  mean: float = 0.1289,
                  std: float = 0.1911,
                  label_string: str = 'EF',
                  label_div: float = 1.0,
-                 num_frames_per_cycle: int = 64,
+                 num_frames_per_cycle: int = 42, # TODO** not used (single clip); reconsider this number if needed
                  classification_classes: np.ndarray = None,
                  zoom_aug: bool = False,
                  test_clip_overlap: int = 0):
@@ -117,7 +117,7 @@ class CamusDataset(Dataset, ABC):
         self.classification_labels = torch.tensor(self.classification_labels, dtype=torch.long)
         self.regression_labels = torch.tensor(self.regression_labels / label_div, dtype=torch.float32)
 
-        # TODO** Create sample weights based on histogram of sample frequency
+        # TODO update?** Create sample weights based on histogram of sample frequency
         hist, bins = np.histogram(self.regression_labels, bins=60)
         hist = hist + 100
         hist = np.clip(hist, a_min=0, a_max=400)
@@ -127,7 +127,7 @@ class CamusDataset(Dataset, ABC):
         self.sample_intervals[0] = 0
         self.sample_intervals[-1] = 1.0
 
-        # Normalization operation
+        # Normalization operation; converts to tensor and changes video to FxHxW
         self.trans = Compose([ToTensor(),
                               Normalize((mean), (std))])
 
@@ -137,10 +137,10 @@ class CamusDataset(Dataset, ABC):
             self.upsample = Upsample(size=(112, 112), mode='nearest')
 
         # Other attributes
-        self.num_frames = num_frames # TODO: might require change in architecture
+        self.num_frames = num_frames
         self.num_vids_per_sample = 2
-        self.num_clips_per_vid = num_clips_per_vid # TODO** for short cines, do we require this?
-        self.num_frames_per_cycle = num_frames_per_cycle # TODO** must this be static? can it be variable
+        self.num_clips_per_vid = num_clips_per_vid
+        self.num_frames_per_cycle = num_frames_per_cycle
         self.zoom_aug = zoom_aug
         self.test_clip_overlap = test_clip_overlap
 
@@ -164,11 +164,11 @@ class CamusDataset(Dataset, ABC):
                                     self.patient_data_dirs[idx] + '_4CH_sequence.mhd')
         AP4_cine_vid = load_cine(AP4_vid_path)[0]
 
-        # Transform videos (AP2 and AP4) TODO** Does this turn the video from HxWxF to FxHxW? (cont assume it does)
+        # Transform videos (AP2 and AP4)
         AP2_cine_vid = self.trans(AP2_cine_vid)
         AP4_cine_vid = self.trans(AP4_cine_vid)
 
-        # TODO** Perform augmentation during training
+        # TODO update?** Perform augmentation during training
         if (idx in self.train_idx) and self.zoom_aug:
             if np.random.randint(0, 2):
                 # Hardcoded for now
@@ -177,19 +177,12 @@ class CamusDataset(Dataset, ABC):
                 AP4_cine_vid = AP4_cine_vid[:, 0:90, 20:92].unsqueeze(1)
                 AP4_cine_vid = self.upsample(AP4_cine_vid).squeeze(1)
 
-        # Test behaviour and Train behaviour are different
-        if idx in self.test_idx or idx in self.val_idx:
-            cine_vid, frame_idx = self.extract_test_data(AP2_cine_vid, AP4_cine_vid)
-        else:
-            cine_vid, frame_idx = self.extract_train_data(cine_vid)
-
-        # Interpolate if needed
-        if cine_vid.shape[2] < self.num_frames:
-            cine_vid = torch.cat((cine_vid, torch.zeros(cine_vid.shape[0], 1,
-                                                        self.num_frames - cine_vid.shape[2], 112, 112)),
-                                 dim=2)
+        # Test behaviour and Train behaviour are the same: video becomes a clip with zero-padding at the end
+        AP2_cine_vid = self.extract_data(AP2_cine_vid)
+        AP4_cine_vid = self.extract_data(AP4_cine_vid)
 
         # Create fully connected graph
+        # TODO: implement AP2 + AP4 into single graph
         nx_graph = nx.complete_graph(self.num_frames, create_using=nx.DiGraph())
         for i in range(1, cine_vid.shape[0]):
             nx_graph = nx.compose(nx_graph, nx.complete_graph(range(i*self.num_frames,
@@ -209,100 +202,32 @@ class CamusDataset(Dataset, ABC):
 
         return g
 
-    def extract_test_data(self, cine_vid: torch.tensor, cine_vid_AP4: torch.tensor) -> (torch.tensor, np.ndarray):
+    def extract_data(self, cine_vid: torch.tensor) -> (torch.tensor, np.ndarray):
         """
-        Extract the test data
+        Extract the data; a single cine video with zero-padding at the end
 
-        :param cine_vid: torch.tensor, input tensor of shape T*H*W
-        :param cine_vid_AP4: torch.tensor, input tensor of shape frames * height * width
-        :return: return the extracted cine video (torch tensor) of shape num_clips*1*num_frames*H*W
-        """
-
-        # Extract number of frames per video
-        video_num_frames = cine_vid.shape[0]
-
-        # Extract the initial frame for each clip
-        initial_frames = np.arange(start=0, stop=video_num_frames, step=self.num_frames - self.test_clip_overlap)
-
-        # Extract the first clip
-        try:
-            cine_vids = cine_vid[0: self.num_frames].unsqueeze(0)
-            frame_idx = np.arange(start=0, stop=self.num_frames)
-        except (IndexError, RuntimeError) as e:
-            cine_vids = cine_vid[0:].unsqueeze(0)
-            frame_idx = np.arange(start=0, stop=video_num_frames)
-
-        # Extract consecutive clips
-        if self.num_frames < video_num_frames:
-            # Get back to back clips
-            for initial_idx in initial_frames[1:]:
-                try:
-                    cine_vids = torch.cat([cine_vids,
-                                           cine_vid[initial_idx: initial_idx + self.num_frames].unsqueeze(0)], dim=0)
-                    frame_idx = np.vstack([frame_idx, np.arange(start=initial_idx, stop=initial_idx + self.num_frames)])
-
-                # If the last clip overshoots the video, overlap it with the previous clip
-                except (IndexError, RuntimeError) as e:
-                    cine_vids = torch.cat([cine_vids,
-                                           cine_vid[video_num_frames - self.num_frames:].unsqueeze(0)], dim=0)
-                    frame_idx = np.vstack([frame_idx, np.arange(start=video_num_frames - self.num_frames,
-                                                                stop=video_num_frames)])
-
-        cine_vid = cine_vids.unsqueeze(1)
-        return cine_vid, frame_idx
-
-    def extract_train_data(self, cine_vid: torch.tensor) -> (torch.tensor, np.ndarray):
-        """
-        Extract the train data
-
-        :param cine_vid: torch.tensor, input tensor of shape T*H*W
-        :return: return the extracted cine video (torch tensor) of shape num_clips_per_vid*1*num_frames*H*W
+        :param cine_vid: torch.tensor, input tensor of shape frames * height * width
+        :return: torch.tensor, the extracted cine videos of shape 1 * 1 * 42 * height * width (zero-padded at end)
         """
 
         # Extract number of frames per video
         video_num_frames = cine_vid.shape[0]
 
-        # if the required number of frames is larger than the available number of frames in the video
-        # take the whole video
-        if self.num_frames > video_num_frames:
-            cine_vid = cine_vid[list(range(0, video_num_frames))].unsqueeze(0).unsqueeze(1)
-            frame_idx = np.arange(start=0, stop=video_num_frames)
-            # Use the same video multiple times since not enough frames are available
-            if self.num_clips_per_vid > 1:
-                cine_vid = torch.tensor(np.vstack([cine_vid] * self.num_clips_per_vid))
-                frame_idx = np.vstack([frame_idx] * self.num_clips_per_vid)
+        # Extract the video
+        cine_vids = cine_vid[0: video_num_frames]
 
-        # take num_frames from the whole range of the video if number of frame per cycle is larger than video length
-        elif self.num_frames_per_cycle > video_num_frames:
-            frame_idx = np.floor(np.linspace(0,
-                                             video_num_frames - 1,
-                                             self.num_frames)).astype(np.int32).tolist()
-            cine_vid = cine_vid[frame_idx].unsqueeze(0).unsqueeze(1)
-            if self.num_clips_per_vid > 1:
-                cine_vid = torch.tensor(np.vstack([cine_vid] * self.num_clips_per_vid))
-                frame_idx = np.vstack([frame_idx] * self.num_clips_per_vid)
+        # Pad video with zeros to fit 42 frames
+        pad_num_frames = 42 - video_num_frames
+        pad = torch.zeros(pad_num_frames, cine_vid.shape[1], cine_vid.shape[2])
 
-        # Follow the procedure outlined in the paper
-        else:
-            initial_frame = randint(0, video_num_frames - self.num_frames_per_cycle)
-            frame_idx_prim = np.floor(np.linspace(initial_frame,
-                                                  initial_frame + self.num_frames_per_cycle - 1,
-                                                  self.num_frames)).astype(np.int32).tolist()
-            cine_vid_prim = cine_vid[frame_idx_prim].unsqueeze(0).unsqueeze(1)
+        # Concatenate video with zero-pad
+        video = torch.cat((cine_vids, pad), dim=0)
 
-            for i in range(1, self.num_clips_per_vid):
-                initial_frame = randint(0, video_num_frames - self.num_frames_per_cycle)
-                frame_idx_temp = np.floor(np.linspace(initial_frame,
-                                                      initial_frame + self.num_frames_per_cycle - 1,
-                                                      self.num_frames)).astype(np.int32).tolist()
-                cine_vid_temp = cine_vid[frame_idx_temp].unsqueeze(0).unsqueeze(1)
-                cine_vid_prim = torch.tensor(np.vstack((cine_vid_prim, cine_vid_temp)))
-                frame_idx_prim = np.vstack((frame_idx_prim, frame_idx_temp))
+        # Add dimensions 1 * 1 to work with existing code
+        dim1 = video.unsqueeze(0)
+        final = dim1.unsqueeze(1)
 
-            cine_vid = cine_vid_prim
-            frame_idx = frame_idx_prim
-
-        return cine_vid, frame_idx
+        return final
 
     def __len__(self):
         """
