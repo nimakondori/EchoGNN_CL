@@ -49,8 +49,8 @@ class CamusDataset(Dataset, ABC):
                  dataset_path: str,
                  num_frames: int = 42, # corresponds to the largest number of frames in a single video
                  num_clips_per_vid: int = 1, # using only 1 clip (with zero-padding if necessary)
-                 mean: float = 0.1289,
-                 std: float = 0.1911,
+                 mean: float = 0.1289, # TODO update?** Where to find source
+                 std: float = 0.1911, # TODO update?** Where to find source
                  label_string: str = 'EF',
                  label_div: float = 1.0,
                  num_frames_per_cycle: int = 42, # TODO** not used (single clip); reconsider this number if needed
@@ -149,19 +149,20 @@ class CamusDataset(Dataset, ABC):
         Fetch a sample from the dataset
 
         :param idx: int, index to extract from the dataset
-        :return: torch_geometric.data.data, PyG data
+        :return: torch_geometric.data.data, PyG data (graph)
         """
 
         # Get the label
         regression_label = self.regression_labels[idx]
         classification_label = self.classification_labels[idx]
 
+
         # Get the videos (AP2 and AP4)
-        AP2_vid_path = os.path.join(self.dataset_path, self.patient_data_dirs[idx],
-                                    self.patient_data_dirs[idx] + '_2CH_sequence.mhd')
+        file = self.patient_data_dirs[idx] + '_2CH_sequence.mhd'
+        AP2_vid_path = os.path.join(self.dataset_path, self.patient_data_dirs[idx], file)
+        file = self.patient_data_dirs[idx] + '_4CH_sequence.mhd'
         AP2_cine_vid = load_cine(AP2_vid_path)[0]
-        AP4_vid_path = os.path.join(self.dataset_path, self.patient_data_dirs[idx],
-                                    self.patient_data_dirs[idx] + '_4CH_sequence.mhd')
+        AP4_vid_path = os.path.join(self.dataset_path, self.patient_data_dirs[idx], file)
         AP4_cine_vid = load_cine(AP4_vid_path)[0]
 
         # Transform videos (AP2 and AP4)
@@ -181,24 +182,27 @@ class CamusDataset(Dataset, ABC):
         AP2_cine_vid = self.extract_data(AP2_cine_vid)
         AP4_cine_vid = self.extract_data(AP4_cine_vid)
 
-        # Create fully connected graph
-        # TODO: implement AP2 + AP4 into single graph
-        nx_graph = nx.complete_graph(self.num_frames, create_using=nx.DiGraph())
-        for i in range(1, cine_vid.shape[0]):
-            nx_graph = nx.compose(nx_graph, nx.complete_graph(range(i*self.num_frames,
+        # Prepare tensor of shape [number of views (AP2, AP4) * 1 * 1 * 42 * height * width]
+        video = torch.stack((AP2_cine_vid, AP4_cine_vid), 0)
+
+        # TODO: Create fully connected graph
+        nx_graph = nx.complete_graph(self.num_frames, create_using=nx.DiGraph()) # graph of size (42)
+        for i in range(1, video.shape[0]): # for each clip
+            nx_graph = nx.compose(nx_graph, nx.complete_graph(range(i*self.num_frames,          #range(42, 84)
                                                                     (i+1)*self.num_frames),
-                                                              create_using=nx.DiGraph()))
+                                                              create_using=nx.DiGraph())) # graph of size ____
+
 
         g = from_networkx(nx_graph)
 
         # Add images and label to graph
-        g.x = cine_vid
+        g.x = video
         g.regression_y = regression_label
         g.classification_y = classification_label
         g.es_frame = self.es_frames[idx]
         g.ed_frame = self.ed_frames[idx]
         g.vid_dir = self.patient_data_dirs[idx]
-        g.frame_idx = frame_idx
+        g.frame_idx = np.arange(start=0, stop=self.num_frames)
 
         return g
 
@@ -206,8 +210,8 @@ class CamusDataset(Dataset, ABC):
         """
         Extract the data; a single cine video with zero-padding at the end
 
-        :param cine_vid: torch.tensor, input tensor of shape frames * height * width
-        :return: torch.tensor, the extracted cine videos of shape 1 * 1 * 42 * height * width (zero-padded at end)
+        :param cine_vid: torch.tensor, input tensor of shape [frames * height * width]
+        :return: torch.tensor, the extracted cine videos of shape [1 * 1 * 42 * height * width] (zero-padded at end)
         """
 
         # Extract number of frames per video
