@@ -13,7 +13,7 @@ from torch.nn import Upsample
 import cv2
 from random import randint
 from math import isnan
-
+from src.core import datasplit
 
 class EchoNetEfDataset(Dataset, ABC):
     """
@@ -78,6 +78,18 @@ class EchoNetEfDataset(Dataset, ABC):
 
         # CSV file containing file names and labels
         filelist_df = pd.read_csv(os.path.join(dataset_path, 'FileList.csv'))
+
+        # Extract 30% data from filelist (with same label distribution)
+        bin_size = 10
+        filelist_df30, _, _, _ = datasplit.stratifiedsplit(filelist_df, filelist_df[label_string], label_string, bin_size, second_split_size = 0.7)
+        
+        # Modifying split columns for 60% train, 20% val, 20% test sets
+        train_size = math.ceil(len(filelist_df30)*0.6)
+        val_size = math.ceil(len(filelist_df30)*0.2)
+
+        filelist_df30.iloc[:train_size]['Split'].replace(['VAL','TEST'], 'TRAIN', inplace=True)
+        filelist_df30.iloc[train_size: train_size + val_size]['Split'].replace(['TRAIN','TEST'], 'VAL', inplace=True)
+        filelist_df30.iloc[train_size + val_size:]['Split'].replace(['VAL','TRAIN'], 'TEST', inplace=True)
 
         # Extract Split information
         splits = np.array(filelist_df['Split'].tolist())
