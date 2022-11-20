@@ -1,6 +1,8 @@
 import logging
 import torch.nn as nn
 from copy import deepcopy
+
+from src.core.contrastive_loss import ContrastiveLoss
 from src.core.criteria import L1SparsityLoss
 
 
@@ -9,7 +11,8 @@ CRITERIA = {'mae': nn.L1Loss,
             'smoothmae': nn.SmoothL1Loss,
             'mse': nn.MSELoss,
             'crossentropy': nn.CrossEntropyLoss,
-            'bce': nn.BCELoss}
+            'bce': nn.BCELoss,
+            'contrastive': ContrastiveLoss}
 
 
 def build(config: dict, logger: logging.Logger) -> dict:

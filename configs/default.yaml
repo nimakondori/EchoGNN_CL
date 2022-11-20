@@ -1,7 +1,7 @@
 # Training and optimization configs
 train:
-  num_epochs: 10000
-  batch_size: 80
+  num_epochs: 700
+  batch_size: 3
   num_workers: 0
   # Prints number of parameters in the model
   print_model_stats: True
@@ -10,8 +10,8 @@ train:
   # Indicates whether visualizations are made during test time
   eval_visualization: False
   # Indicates whether Wandb is used to keep track of runs
-  use_wandb: False
-  wand_project_name: echognn
+  use_wandb: True
+  wand_project_name: echognn_cl
   wandb_mode: online
 
   # Objective functions
@@ -42,6 +42,14 @@ train:
       node_lambda: 0.0
       edge_lambda: 0.0
 
+#     Contrastive Loss to encourage informed embeddings
+    contrastive:
+      name: contrastive
+      lambda: 0.001
+      ed_adj_count: 3
+      es_adj_count: 5
+#      margin: 0.025
+
   # Training optimizer configs
   optimizer:
     name: adam
@@ -66,7 +74,7 @@ eval:
 # Model-specific configs
 model:
   # Path to checkpoint to continue training from or for evaluation (testing)
-  checkpoint_path: ./trained_models/miccai2022.pth
+  checkpoint_path:
   # Path to pretrained model
   pretrained_path:
 
@@ -99,12 +107,14 @@ model:
 # Dataset configs
 dataset:
   # Path to dataset
-  dataset_path: <path_to_dataset>
+  dataset_path: C:\Users\nimako\Documents\workspace\datasets\echonet
   # Name of the dataset
   name: echonet
   # The mean and std for the Echonet-Dynamic dataset uses to standardize data
   mean: 0.1289
   std: 0.1911
+  # The size of the sample of the data to use
+  sample_size: 0.01
   # The label string indicating the label column in the provided dataset csv
   label_string: EF
   # Divide labels by

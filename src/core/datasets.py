@@ -47,6 +47,7 @@ class EchoNetEfDataset(Dataset, ABC):
                  dataset_path: str,
                  num_frames: int = 32,
                  num_clips_per_vid: int = 1,
+                 sample_size: float = 1,
                  mean: float = 0.1289,
                  std: float = 0.1911,
                  label_string: str = 'EF',
@@ -59,6 +60,7 @@ class EchoNetEfDataset(Dataset, ABC):
         :param dataset_path: str, path to dataset directory
         :param num_frames: int, number of frames per clip
         :param num_clips_per_vid: int, number of clips per video
+        :param sample_size: int, what percentage of the data to use. 1 to use the entire dataset
         :param mean: float, mean used in data standardization
         :param std: float, std used in data standardization
         :param label_string: str, string indicating which column in dataset CSV is for the labels
@@ -78,6 +80,9 @@ class EchoNetEfDataset(Dataset, ABC):
 
         # CSV file containing file names and labels
         filelist_df = pd.read_csv(os.path.join(dataset_path, 'FileList.csv'))
+
+        if sample_size != 1:
+            filelist_df = filelist_df.sample(n=int(sample_size*len(filelist_df)))
 
         # Extract Split information
         splits = np.array(filelist_df['Split'].tolist())

@@ -168,6 +168,10 @@ class Engine(object):
             # Extract classification loss configs
             self.classification_lambda = self.train_config['criteria']['classification'].pop('lambda')
 
+            # Extract contrastive loss configs
+            self.contrastive_loss_lambda = self.train_config['criteria']['contrastive'].pop('lambda')
+            # self.contrastive_margin = self.train_config['criteria']['contrastive'].pop('margin')
+
     def _build(self,
                phase: str = 'training'):
         """
@@ -358,6 +362,11 @@ class Engine(object):
             # Create embeddings from video inputs
             x = self.model['video_encoder'](x)
 
+            # contrastive loss applied to only labeled ED and ES frames
+            batch_size = self.train_config.get("batch_size", 3)
+            num_clips_per_video = self.train_config.get("num_clips_per_vid", 3)
+            contrastive_loss = self.criteria["contrastive"](data, x, batch_size, num_clips_per_video)
+
             # Get node and edge weights
             node_weights, edge_weights = self.model['attention_encoder'](x)
 
@@ -402,7 +411,8 @@ class Engine(object):
             # Compute total loss
             loss = regression_loss + \
                    self.classification_lambda * classification_loss + \
-                   self.node_sparsity_lambda * node_sparsity_loss + self.edge_sparsity_lambda * edge_sparsity_loss
+                   self.node_sparsity_lambda * node_sparsity_loss + self.edge_sparsity_lambda * edge_sparsity_loss +\
+                   self.contrastive_loss_lambda * contrastive_loss
 
             # Backprop
             loss.backward()
@@ -413,7 +423,8 @@ class Engine(object):
                 update_meters(self.loss_meters, {'regression': regression_loss.detach().item(),
                                                  'classification': classification_loss.detach().item(),
                                                  'node_sparsity': node_sparsity_loss.detach().item(),
-                                                 'edge_sparsity': edge_sparsity_loss.detach().item()})
+                                                 'edge_sparsity': edge_sparsity_loss.detach().item(),
+                                                 'contrastive': contrastive_loss.detach().item()})
 
                 try:
                     update_evaluators(self.evaluators,
@@ -435,7 +446,9 @@ class Engine(object):
             total_loss = self.loss_meters['regression'].avg + \
                          self.classification_lambda * self.loss_meters['classification'].avg + \
                          self.node_sparsity_lambda * self.loss_meters['node_sparsity'].avg + \
-                         self.edge_sparsity_lambda * self.loss_meters['edge_sparsity'].avg
+                         self.edge_sparsity_lambda * self.loss_meters['edge_sparsity'].avg + \
+                         self.contrastive_loss_lambda * self.loss_meters['contrastive'].avg
+
 
             # Print epoch summary
             print_epoch_results(logger=self.logger,
@@ -446,7 +459,8 @@ class Engine(object):
                                 losses={'regression': self.loss_meters['regression'].avg,
                                         'classification': self.loss_meters['classification'].avg,
                                         'node sparsity': self.loss_meters['node_sparsity'].avg,
-                                        'edge sparsity': self.loss_meters['edge_sparsity'].avg},
+                                        'edge sparsity': self.loss_meters['edge_sparsity'].avg,
+                                        'contrastive': self.loss_meters['contrastive'].avg},
                                 eval_metrics=eval_metrics)
 
             if self.train_config['use_wandb']:
@@ -456,6 +470,7 @@ class Engine(object):
                                   'classification': self.loss_meters['classification'].avg,
                                   'node_sparsity': self.loss_meters['node_sparsity'].avg,
                                   'edge_sparsity': self.loss_meters['edge_sparsity'].avg,
+                                  'contrastive': self.loss_meters['contrastive'].avg,
                                   'total_loss': total_loss},
                           eval_metrics=eval_metrics)
 
@@ -525,6 +540,12 @@ class Engine(object):
                 # Create embeddings from video inputs
                 x = self.model['video_encoder'](x)
 
+                # size is 1 during evaluation
+                batch_size = 1
+                num_clips_per_video = len(data.x)
+                # Apply contrastive loss to applicable eval data
+                contrastive_loss = self.criteria["contrastive"](data, x, batch_size, num_clips_per_video)
+
                 # Get node and edge weights
                 node_weights, edge_weights = self.model['attention_encoder'](x)
 
@@ -563,7 +584,9 @@ class Engine(object):
                 update_meters(self.loss_meters, {'regression': regression_loss.detach().item(),
                                                  'classification': classification_loss.detach().item(),
                                                  'node_sparsity': node_sparsity_loss.detach().item(),
-                                                 'edge_sparsity': edge_sparsity_loss.detach().item()})
+                                                 'edge_sparsity': edge_sparsity_loss.detach().item(),
+                                                 'contrastive': contrastive_loss.detach().item()
+                                                 })
 
                 try:
                     update_evaluators(self.evaluators,
@@ -638,7 +661,8 @@ class Engine(object):
             total_loss = self.loss_meters['regression'].avg + \
                          self.classification_lambda * self.loss_meters['classification'].avg + \
                          self.node_sparsity_lambda * self.loss_meters['node_sparsity'].avg + \
-                         self.edge_sparsity_lambda * self.loss_meters['edge_sparsity'].avg
+                         self.edge_sparsity_lambda * self.loss_meters['edge_sparsity'].avg + \
+                         self.contrastive_loss_lambda * self.loss_meters['contrastive'].avg
 
             # Print epoch summary
             print_epoch_results(logger=self.logger,
@@ -649,7 +673,8 @@ class Engine(object):
                                 losses={'regression': self.loss_meters['regression'].avg,
                                         'classification': self.loss_meters['classification'].avg,
                                         'node sparsity': self.loss_meters['node_sparsity'].avg,
-                                        'edge sparsity': self.loss_meters['edge_sparsity'].avg},
+                                        'edge sparsity': self.loss_meters['edge_sparsity'].avg,
+                                        'contrastive': self.loss_meters['contrastive'].avg},
                                 eval_metrics=eval_metrics)
 
             if self.train_config['use_wandb']:
@@ -659,6 +684,7 @@ class Engine(object):
                                   'classification': self.loss_meters['classification'].avg,
                                   'node_sparsity': self.loss_meters['node_sparsity'].avg,
                                   'edge_sparsity': self.loss_meters['edge_sparsity'].avg,
+                                  'contrastive': self.loss_meters['contrastive'].avg,
                                   'total_loss': total_loss},
                           eval_metrics=eval_metrics)
 
