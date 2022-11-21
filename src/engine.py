@@ -3,6 +3,8 @@ import os.path
 import numpy as np
 import yaml
 import torch
+from tqdm import tqdm
+
 from src.builders import model_builder, optimizer_builder, scheduler_builder, criteria_builder, meter_builder, \
     evaluator_builder, checkpointer_builder, dataset_builder, dataloader_builder
 from src.utils import to_train, to_eval, count_parameters, reset_evaluators, update_evaluators, compute_evaluators, \
@@ -331,6 +333,7 @@ class Engine(object):
         Performs one epoch of training
         :param epoch: int, epoch number
         """
+        epoch_steps = len(self.dataloader['train'])
         self.logger.info('Training epoch {} has started.'.format(epoch))
 
         # Start timer
@@ -345,8 +348,10 @@ class Engine(object):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        for data in trainloader:
+        data_iter = iter(self.dataloader['train'])
 
+        for i in tqdm(range(epoch_steps), dynamic_ncols=True):
+            data = next(data_iter)
             # Move data to correct device
             data = data.to(self.device)
 
@@ -512,6 +517,7 @@ class Engine(object):
 
             # Get dataloader
             evalloader = self.dataloader[phase]
+            epoch_steps = len(self.dataloader[phase])
 
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -521,7 +527,9 @@ class Engine(object):
                 ytrue = np.array([])
                 ypred = np.array([])
 
-            for data in evalloader:
+            eval_iter = iter(evalloader)
+            for i in tqdm(range(epoch_steps), dynamic_ncols=True):
+                data = next(eval_iter)
                 # Move data to correct device
                 data = data.to(self.device)
 
