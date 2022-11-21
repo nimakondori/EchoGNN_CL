@@ -10,7 +10,7 @@ train:
   # Indicates whether visualizations are made during test time
   eval_visualization: False
   # Indicates whether Wandb is used to keep track of runs
-  use_wandb: True
+  use_wandb: False
   wand_project_name: echognn_cl
   wandb_mode: online
 
@@ -46,8 +46,8 @@ train:
     contrastive:
       name: contrastive
       lambda: 0.001
-      ed_adj_count: 2
-      es_adj_count: 3
+      ed_adj_count: 3
+      es_adj_count: 5
 #      margin: 0.025
 
   # Training optimizer configs
