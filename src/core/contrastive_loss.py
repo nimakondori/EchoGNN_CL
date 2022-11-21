@@ -73,7 +73,7 @@ class ContrastiveLoss(nn.Module):
             custom_margin[custom_margin > 1] = 1      #For volume contrastive loss, constrain margin to less than 1
         # d_positive, d_negative = 0, 0
 
-        loss = torch.clamp(custom_margin - d_positive + d_negative, min=0.0).mean()
+        loss = torch.clamp(custom_margin + d_positive - d_negative, min=0.0).mean()
         # print('d_positive d_negative', d_positive, d_negative)
         return loss
 
@@ -111,12 +111,13 @@ class ContrastiveLoss(nn.Module):
         distance = 0
         for embedding in target:
             distance += self.distance(a=anchor, b=embedding)
-        return distance.mean()
+        return distance / len(target)
 
-    def calculate_distance2(self, embeddings: list, anchor_idx: tuple, target_idx: list):
+    def calculate_distance2(self, embeddings: torch.tensor, anchor_idx: tuple, target_idx: list):
         distance = 0
         # This function is called on each j so the row of the embeddings and the anchor is the same
         target_row = anchor_idx[0]
         for col in target_idx:
             distance += self.distance(a=embeddings[anchor_idx], b=embeddings[target_row, col])
-        return distance.mean()
+        # return the average to keep the scale of negative and positive distances the same
+        return distance / len(target_idx)
