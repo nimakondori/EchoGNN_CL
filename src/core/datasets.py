@@ -49,6 +49,7 @@ class EchoNetEfDataset(Dataset, ABC):
                  num_clips_per_vid: int = 1,
                  mean: float = 0.1289,
                  std: float = 0.1911,
+                 sample_size: float = 1.0,
                  label_string: str = 'EF',
                  label_div: float = 1.0,
                  num_frames_per_cycle: int = 64,
