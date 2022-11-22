@@ -1,7 +1,7 @@
 # Training and optimization configs
 train:
   num_epochs: 10000
-  batch_size: 80
+  batch_size: 15
   num_workers: 0
   # Prints number of parameters in the model
   print_model_stats: True
@@ -99,7 +99,7 @@ model:
 # Dataset configs
 dataset:
   # Path to dataset
-  dataset_path: <path_to_dataset>
+  dataset_path: /mnt/datasets/echonet
   # Name of the dataset
   name: echonet
   # The mean and std for the Echonet-Dynamic dataset uses to standardize data
@@ -107,6 +107,8 @@ dataset:
   std: 0.1911
   # The label string indicating the label column in the provided dataset csv
   label_string: EF
+  # Fraction of dataset size that we will be using
+  sample_size: 0.3
   # Divide labels by
   label_div: 100
   # Indicates the number of random clips extracted from each video during training
