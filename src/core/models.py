@@ -7,6 +7,8 @@ from copy import deepcopy
 import math
 import numpy as np
 
+from typing import List
+
 
 class MLP(nn.Module):
     """
@@ -240,9 +242,9 @@ class Custom3DConv(nn.Module):
     """
 
     def __init__(self,
-                 out_channels: list[int] = None,
-                 kernel_sizes: list[int] = None,
-                 pool_sizes: list[int] = None,
+                 out_channels: List[int] = None,
+                 kernel_sizes: ListList[int] = None,
+                 pool_sizes: List[int] = None,
                  output_dim: int = 128,
                  cnn_dropout_p: float = 0):
         """
