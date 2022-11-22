@@ -500,6 +500,7 @@ class Engine(object):
 
             # Get dataloader
             evalloader = self.dataloader[phase]
+            epoch_steps = len(self.dataloader[phase])
 
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -688,6 +689,7 @@ class Engine(object):
 
         # Get the training dataloader
         trainloader = self.dataloader['train']
+        epoch_steps = len(self.dataloader['train'])
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
