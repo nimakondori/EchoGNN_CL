@@ -80,8 +80,9 @@ class EchoNetEfDataset(Dataset, ABC):
         # CSV file containing file names and labels
         filelist_df = pd.read_csv(os.path.join(dataset_path, 'FileList.csv'))
 
-        if sample_size != 1:
-            filelist_df = filelist_df.sample(n=int(sample_size * len(filelist_df)))
+        if sample_size != 1.0:
+            # Random state set for reproducibility of the data
+            filelist_df = filelist_df.sample(n=int(sample_size * len(filelist_df)), random_state=42)
 
         # Extract Split information
         splits = np.array(filelist_df['Split'].tolist())
