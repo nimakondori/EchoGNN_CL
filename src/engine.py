@@ -11,6 +11,7 @@ from src.utils import to_train, to_eval, count_parameters, reset_evaluators, upd
 import time
 from torch_geometric.utils import to_dense_adj
 from src.utils import draw_ef_plots
+from tqdm import tqdm
 
 # Optional Packages
 try:
@@ -341,8 +342,10 @@ class Engine(object):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        for data in trainloader:
+        data_iter = iter(self.dataloader['train'])
 
+        for i in tqdm(range(epoch_steps), dynamic_ncols=True):
+            data = next(data_iter)
             # Move data to correct device
             data = data.to(self.device)
 
@@ -506,7 +509,10 @@ class Engine(object):
                 ytrue = np.array([])
                 ypred = np.array([])
 
-            for data in evalloader:
+            eval_iter = iter(evalloader)
+            for i in tqdm(range(epoch_steps), dynamic_ncols=True):
+                data = next(eval_iter)
+
                 # Move data to correct device
                 data = data.to(self.device)
 
