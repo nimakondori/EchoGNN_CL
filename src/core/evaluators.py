@@ -252,7 +252,7 @@ class F1ScoreEvaluator(object):
     compute(): computes the accuracy using the information in y_pred and y_true
     """
 
-    def __init__(self, threshold: float = 0.4):
+    def __init__(self, threshold: float = 0.6):
         """
         :param threshold: float, the threshold used to binarize y_pred
         """

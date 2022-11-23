@@ -1,7 +1,7 @@
 # Training and optimization configs
 train:
   num_epochs: 2000
-  batch_size: 3
+  batch_size: 5
   num_workers: 0
   # Prints number of parameters in the model
   print_model_stats: True
@@ -45,7 +45,7 @@ train:
 #     Contrastive Loss to encourage informed embeddings
     contrastive:
       name: contrastive
-      lambda: 0.001
+      lambda: 0.0001
       ed_adj_count: 3
       es_adj_count: 5
 #      margin: 0.025
