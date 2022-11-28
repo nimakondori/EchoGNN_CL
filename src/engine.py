@@ -573,7 +573,8 @@ class Engine(object):
                             emb = x[n, :]
                             reduced_emb = reducer.fit_transform(emb.detach().cpu().numpy())
                             save_umap_plots(reduced_emb[:, 0], reduced_emb[:, 1], labels=labels[n],
-                                            title=f"epoch{epoch+1}_fig{n}", save_path="umaps")
+                                            title=f"epoch{epoch+1}_fig{n}", save_path="umaps",
+                                            ed_color=ed_color, es_color=es_color)
                             umap_done = True
 
                 # size is 1 during evaluation

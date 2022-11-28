@@ -17,8 +17,8 @@ train:
     epochs: 1
     ed_count: 3
     es_count: 5
-    ed_color: red
-    es_color: blue
+    ed_color: r
+    es_color: b
   use_wandb: False
   wand_project_name: echognn_cl
   wandb_mode: online

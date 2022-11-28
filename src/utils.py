@@ -864,7 +864,9 @@ def save_umap_plots(x: list,
                     save_path: str,
                     title: str = None,
                     xlabel: str = None,
-                    ylabel: str = None):
+                    ylabel: str = None,
+                    ed_color: str = 'r',
+                    es_color: str = 'b'):
     # Create directory to save visualizations to
     path = os.path.join(save_path)
     os.makedirs(path, exist_ok=True)
@@ -873,10 +875,12 @@ def save_umap_plots(x: list,
         plt.xlabel(xlabel)
     if ylabel is not None:
         plt.ylabel(ylabel)
+    if title is not None:
+        plt.title(title)
     # Define different colors for the frames
-    plt.scatter(x[labels == 0], y[labels == 0], c='b', label="N/A")
-    plt.scatter(x[labels == 1], y[labels == 1], c='r', label="ED")
-    plt.scatter(x[labels == 2], y[labels == 2], c='y', label="ES")
+    plt.scatter(x[labels == 0], y[labels == 0], c='m', label="N/A")
+    plt.scatter(x[labels == 1], y[labels == 1], c=ed_color, label="ED")
+    plt.scatter(x[labels == 2], y[labels == 2], c=es_color, label="ES")
     plt.legend()
     plt.savefig(os.path.join(path, title)+".png")
     plt.clf()
