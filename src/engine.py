@@ -569,19 +569,19 @@ class Engine(object):
 
                 # Draw a umap
 
-                if self.train_config["umap"]['visualize'] and ((epoch+1) % self.train_config["umap"]["epochs"] == 0):
-                    reducer = umap.UMAP()
-                    # choose a random clip of the video
-                    ed_count = self.train_config["umap"]['ed_count']
-                    es_count = self.train_config["umap"]['es_count']
-                    # Since batch size is one we just pass frame_idx[0]
-                    labels = get_labels_from_idx(data.frame_idx[0], data.ed_frame.item(),
-                                                 data.es_frame.item(), ed_count, es_count)
-                    for n in range(len(labels)):
-                        emb = x[n, :]
-                        reduced_emb = reducer.fit_transform(emb.detach().cpu().numpy())
-                        save_umap_plots(reduced_emb[:, 0], reduced_emb[:, 1], labels=labels[n],
-                                        title=f"epoch{epoch+1}_fig{n}", save_path="umaps")
+            if self.train_config["umap"]['visualize'] and ((epoch+1) % self.train_config["umap"]["epochs"] == 0):
+                reducer = umap.UMAP()
+                # choose a random clip of the video
+                ed_count = self.train_config["umap"]['ed_count']
+                es_count = self.train_config["umap"]['es_count']
+                # Since batch size is one we just pass frame_idx[0]
+                labels = get_labels_from_idx(data.frame_idx[0], data.ed_frame.item(),
+                                             data.es_frame.item(), ed_count, es_count)
+                for n in range(len(labels)):
+                    emb = x[n, :]
+                    reduced_emb = reducer.fit_transform(emb.detach().cpu().numpy())
+                    save_umap_plots(reduced_emb[:, 0], reduced_emb[:, 1], labels=labels[n],
+                                    title=f"epoch{epoch+1}_fig{n}", save_path="umaps")
 
                     # Get node and edge weights
                 node_weights, edge_weights = self.model['attention_encoder'](x)
