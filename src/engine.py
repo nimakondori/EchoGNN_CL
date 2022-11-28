@@ -1,15 +1,17 @@
 import logging
 import os.path
+import matplotlib.pyplot as plt
 import numpy as np
 import yaml
 import torch
+import umap
 from tqdm import tqdm
 
 from src.builders import model_builder, optimizer_builder, scheduler_builder, criteria_builder, meter_builder, \
     evaluator_builder, checkpointer_builder, dataset_builder, dataloader_builder
 from src.utils import to_train, to_eval, count_parameters, reset_evaluators, update_evaluators, compute_evaluators, \
     print_epoch_results, reset_meters, update_meters, save_echo_graph, compute_ed_frame_distance, \
-    print_es_ed_dist_summary, compute_es_frame_distance, wandb_log
+    print_es_ed_dist_summary, compute_es_frame_distance, wandb_log, get_labels_from_idx, save_umap_plots
 import time
 from torch_geometric.utils import to_dense_adj
 from src.utils import draw_ef_plots
@@ -367,6 +369,16 @@ class Engine(object):
             # Create embeddings from video inputs
             x = self.model['video_encoder'](x)
 
+            # Choose a sample video to draw umap every 50 epochs
+            # if epoch % 50:
+            # i = random.randint(0, len(x))
+            # embeddings = x[1, :]
+            # reducer = umap.UMAP()
+            # reduced_embeddings = reducer.fit_transform(embeddings.cpu().detach().numpy())
+            #
+            # fig, ax = plt.subplots()
+            # ax.plot(reduced_embeddings[:, 0], reduced_embeddings[:, 1])
+
             # contrastive loss applied to only labeled ED and ES frames
             batch_size = self.train_config.get("batch_size", 3)
             num_clips_per_video = self.train_config.get("num_clips_per_vid", 3)
@@ -479,6 +491,7 @@ class Engine(object):
                                   'total_loss': total_loss},
                           eval_metrics=eval_metrics)
 
+
     def _evaluate_once(self, epoch: int, phase: str = 'val'):
         """
         Performs one epoch of evaluation
@@ -554,7 +567,23 @@ class Engine(object):
                 # Apply contrastive loss to applicable eval data
                 contrastive_loss = self.criteria["contrastive"](data, x, batch_size, num_clips_per_video)
 
-                # Get node and edge weights
+                # Draw a umap
+
+                if self.train_config["umap"]['visualize'] and ((epoch+1) % self.train_config["umap"]["epochs"] == 0):
+                    reducer = umap.UMAP()
+                    # choose a random clip of the video
+                    ed_count = self.train_config["umap"]['ed_count']
+                    es_count = self.train_config["umap"]['es_count']
+                    # Since batch size is one we just pass frame_idx[0]
+                    labels = get_labels_from_idx(data.frame_idx[0], data.ed_frame.item(),
+                                                 data.es_frame.item(), ed_count, es_count)
+                    for n in range(len(labels)):
+                        emb = x[n, :]
+                        reduced_emb = reducer.fit_transform(emb.detach().cpu().numpy())
+                        save_umap_plots(reduced_emb[:, 0], reduced_emb[:, 1], labels=labels[n],
+                                        title=f"epoch{epoch+1}_fig{n}", save_path="umaps")
+
+                    # Get node and edge weights
                 node_weights, edge_weights = self.model['attention_encoder'](x)
 
                 # Create the weighted adjacency matrix for the Graph Regressor
@@ -568,7 +597,7 @@ class Engine(object):
                 regression_predictions, classification_predictions = self.model['graph_regressor'](x=x,
                                                                                                    frame_weights=
                                                                                                    node_weights[:, :,
-                                                                                                                -1],
+                                                                                                   -1],
                                                                                                    adj=adj,
                                                                                                    phase=phase)
 
