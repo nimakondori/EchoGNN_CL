@@ -369,16 +369,6 @@ class Engine(object):
             # Create embeddings from video inputs
             x = self.model['video_encoder'](x)
 
-            # Choose a sample video to draw umap every 50 epochs
-            # if epoch % 50:
-            # i = random.randint(0, len(x))
-            # embeddings = x[1, :]
-            # reducer = umap.UMAP()
-            # reduced_embeddings = reducer.fit_transform(embeddings.cpu().detach().numpy())
-            #
-            # fig, ax = plt.subplots()
-            # ax.plot(reduced_embeddings[:, 0], reduced_embeddings[:, 1])
-
             # contrastive loss applied to only labeled ED and ES frames
             batch_size = self.train_config.get("batch_size", 3)
             num_clips_per_video = self.train_config.get("num_clips_per_vid", 3)
@@ -540,6 +530,9 @@ class Engine(object):
                 ytrue = np.array([])
                 ypred = np.array([])
 
+            # Wheter we have produced the umape or not
+            umap_done = False
+
             eval_iter = iter(evalloader)
             for i in tqdm(range(epoch_steps), dynamic_ncols=True):
                 data = next(eval_iter)
@@ -561,6 +554,25 @@ class Engine(object):
                 # Create embeddings from video inputs
                 x = self.model['video_encoder'](x)
 
+                # Generate a umap if it is not generated yet
+                if not umap_done and \
+                        self.train_config["umap"]['visualize'] and \
+                        ((epoch+1) % self.train_config["umap"]["epochs"] == 0):
+                    reducer = umap.UMAP()
+                    # choose a random clip of the video
+                    ed_count = self.train_config["umap"]['ed_count']
+                    es_count = self.train_config["umap"]['es_count']
+                    # Since batch size is one we just pass frame_idx[0]
+                    labels = get_labels_from_idx(data.frame_idx[0], data.ed_frame.item(),
+                                                 data.es_frame.item(), ed_count, es_count)
+                    for n in range(len(labels)):
+                        if 1 in labels[n] and 2 in labels[n]:
+                            emb = x[n, :]
+                            reduced_emb = reducer.fit_transform(emb.detach().cpu().numpy())
+                            save_umap_plots(reduced_emb[:, 0], reduced_emb[:, 1], labels=labels[n],
+                                            title=f"epoch{epoch+1}_fig{n}", save_path="umaps")
+                            umap_done = True
+
                 # size is 1 during evaluation
                 batch_size = 1
                 num_clips_per_video = len(data.x)
@@ -569,19 +581,6 @@ class Engine(object):
 
                 # Draw a umap
 
-            if self.train_config["umap"]['visualize'] and ((epoch+1) % self.train_config["umap"]["epochs"] == 0):
-                reducer = umap.UMAP()
-                # choose a random clip of the video
-                ed_count = self.train_config["umap"]['ed_count']
-                es_count = self.train_config["umap"]['es_count']
-                # Since batch size is one we just pass frame_idx[0]
-                labels = get_labels_from_idx(data.frame_idx[0], data.ed_frame.item(),
-                                             data.es_frame.item(), ed_count, es_count)
-                for n in range(len(labels)):
-                    emb = x[n, :]
-                    reduced_emb = reducer.fit_transform(emb.detach().cpu().numpy())
-                    save_umap_plots(reduced_emb[:, 0], reduced_emb[:, 1], labels=labels[n],
-                                    title=f"epoch{epoch+1}_fig{n}", save_path="umaps")
 
                     # Get node and edge weights
                 node_weights, edge_weights = self.model['attention_encoder'](x)
