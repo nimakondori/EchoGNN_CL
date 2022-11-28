@@ -847,7 +847,7 @@ def get_labels_from_idx(frame_idx: list, ed_idx: int, es_idx: int, ed_count: int
         if es_loc[0]:
             labels[i][es_loc[0][0] - es_count: es_loc[0][0] + es_count] = 2
 
-        return labels
+        return np.array(labels)
 
 
 def get_labels_from_idx_2(frame_idx: list, ed_idx: int, es_idx: int, ed_count: int, es_count: int):
@@ -874,6 +874,9 @@ def save_umap_plots(x: list,
     if ylabel is not None:
         plt.ylabel(ylabel)
     # Define different colors for the frames
-    plt.scatter(x, y, c=labels)
+    plt.scatter(x[labels == 0], y[labels == 0], c='b', label="N/A")
+    plt.scatter(x[labels == 1], y[labels == 1], c='r', label="ED")
+    plt.scatter(x[labels == 2], y[labels == 2], c='y', label="ES")
+    plt.legend()
     plt.savefig(os.path.join(path, title)+".png")
     plt.clf()

@@ -562,6 +562,9 @@ class Engine(object):
                     # choose a random clip of the video
                     ed_count = self.train_config["umap"]['ed_count']
                     es_count = self.train_config["umap"]['es_count']
+                    ed_color = self.train_config["umap"]['ed_color']
+                    es_color = self.train_config["umap"]['es_color']
+
                     # Since batch size is one we just pass frame_idx[0]
                     labels = get_labels_from_idx(data.frame_idx[0], data.ed_frame.item(),
                                                  data.es_frame.item(), ed_count, es_count)
@@ -579,10 +582,9 @@ class Engine(object):
                 # Apply contrastive loss to applicable eval data
                 contrastive_loss = self.criteria["contrastive"](data, x, batch_size, num_clips_per_video)
 
-                # Draw a umap
 
 
-                    # Get node and edge weights
+                # Get node and edge weights
                 node_weights, edge_weights = self.model['attention_encoder'](x)
 
                 # Create the weighted adjacency matrix for the Graph Regressor
