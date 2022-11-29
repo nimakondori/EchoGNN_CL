@@ -889,9 +889,10 @@ def save_umap_plots(x: list,
     ax.scatter(x[labels == 1], y[labels == 1], c=ed_color, label="ED")
     ax.scatter(x[labels == 2], y[labels == 2], c=es_color, label="ES")
     ax.legend()
-    plt.savefig(os.path.join(path, title)+".png")
     if save_to_wandb:
         wandb.log({f'{mode}/vis': fig,
                    f'{mode}/{title}': step_value})
+    else:
+        plt.savefig(os.path.join(path, title)+".png")
     plt.clf()
     plt.close()
