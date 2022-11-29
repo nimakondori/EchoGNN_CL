@@ -865,12 +865,16 @@ def save_umap_plots(x: list,
                     title: str = None,
                     xlabel: str = None,
                     ylabel: str = None,
+                    step_value: int = 1,
+                    mode: str = "batch_train",
                     ed_color: str = 'r',
-                    es_color: str = 'b'):
+                    es_color: str = 'b',
+                    save_to_wandb: bool = True):
     # Create directory to save visualizations to
     path = os.path.join(save_path)
     os.makedirs(path, exist_ok=True)
-    fig = plt.Figure()
+    # fig = plt.Figure()
+    fig, ax = plt.subplots()
     if xlabel is not None:
         plt.xlabel(xlabel)
     if ylabel is not None:
@@ -878,9 +882,16 @@ def save_umap_plots(x: list,
     if title is not None:
         plt.title(title)
     # Define different colors for the frames
-    plt.scatter(x[labels == 0], y[labels == 0], c='m', label="N/A")
-    plt.scatter(x[labels == 1], y[labels == 1], c=ed_color, label="ED")
-    plt.scatter(x[labels == 2], y[labels == 2], c=es_color, label="ES")
-    plt.legend()
+    # plt.scatter(x[labels == 0], y[labels == 0], c='m', label="N/A")
+    # plt.scatter(x[labels == 1], y[labels == 1], c=ed_color, label="ED")
+    # plt.scatter(x[labels == 2], y[labels == 2], c=es_color, label="ES")
+    ax.scatter(x[labels == 0], y[labels == 0], c='m', label="N/A")
+    ax.scatter(x[labels == 1], y[labels == 1], c=ed_color, label="ED")
+    ax.scatter(x[labels == 2], y[labels == 2], c=es_color, label="ES")
+    ax.legend()
     plt.savefig(os.path.join(path, title)+".png")
+    if save_to_wandb:
+        wandb.log({f'{mode}/vis': fig,
+                   f'{mode}/{title}': step_value})
     plt.clf()
+    plt.close()

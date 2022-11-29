@@ -531,7 +531,7 @@ class Engine(object):
                 ypred = np.array([])
 
             # Wheter we have produced the umape or not
-            umap_done = False
+            umap_saved = False
 
             eval_iter = iter(evalloader)
             for i in tqdm(range(epoch_steps), dynamic_ncols=True):
@@ -555,9 +555,11 @@ class Engine(object):
                 x = self.model['video_encoder'](x)
 
                 # Generate a umap if it is not generated yet
-                if not umap_done and \
+                if not umap_saved and \
                         self.train_config["umap"]['visualize'] and \
-                        ((epoch+1) % self.train_config["umap"]["epochs"] == 0):
+                        ((epoch + 1) % self.train_config["umap"]["epochs"] == 0):
+                    save_to_wandb = False if not self.train_config["use_wandb"] else True
+
                     reducer = umap.UMAP()
                     # choose a random clip of the video
                     ed_count = self.train_config["umap"]['ed_count']
@@ -572,10 +574,12 @@ class Engine(object):
                         if 1 in labels[n] and 2 in labels[n]:
                             emb = x[n, :]
                             reduced_emb = reducer.fit_transform(emb.detach().cpu().numpy())
+                            # Save to the images to the disk and/or to wandb
                             save_umap_plots(reduced_emb[:, 0], reduced_emb[:, 1], labels=labels[n],
-                                            title=f"epoch{epoch+1}_fig{n}", save_path="umaps",
-                                            ed_color=ed_color, es_color=es_color)
-                            umap_done = True
+                                            title=f"epoch{epoch + 1}_fig{n}", save_path="umaps",
+                                            ed_color=ed_color, es_color=es_color, step_value=epoch,
+                                            save_to_wandb=save_to_wandb)
+                            umap_saved = True
 
                 # size is 1 during evaluation
                 batch_size = 1
