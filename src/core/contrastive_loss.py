@@ -72,7 +72,7 @@ class ContrastiveLoss(nn.Module):
             custom_margin[custom_margin > 1] = 1      #For volume contrastive loss, constrain margin to less than 1
         # d_positive, d_negative = 0, 0
 
-        loss = torch.clamp(custom_margin + d_positive - 0.0001*d_negative, min=0.0).mean()
+        loss = torch.clamp(custom_margin + d_positive - 0.001*d_negative, min=0.0).mean()
         # print('d_positive d_negative', d_positive, d_negative)
         return loss
 
