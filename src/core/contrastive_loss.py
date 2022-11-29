@@ -1,8 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
-
-from typing import Tuple, List
+import torch.nn.functional as F
 
 
 # The Contrastive Loss implementation is taken from https://github.com/LishinC/VCN
@@ -114,10 +113,12 @@ class ContrastiveLoss(nn.Module):
         return distance / len(target)
 
     def calculate_distance2(self, embeddings: torch.tensor, anchor_idx: tuple, target_idx: list):
+        # out_embedED, out_embedES = F.normalize(out_featureED, p=2, dim=1), F.normalize(out_featureES, p=2, dim=1)
         distance = 0
         # This function is called on each j so the row of the embeddings and the anchor is the same
         target_row = anchor_idx[0]
         for col in target_idx:
-            distance += self.distance(a=embeddings[anchor_idx], b=embeddings[target_row, col])
+            distance += self.distance(a=F.normalize(embeddings[anchor_idx],p=2, dim=0),
+                                      b=F.normalize(embeddings[target_row, col], p=2, dim=0))
         # return the average to keep the scale of negative and positive distances the same
         return distance / len(target_idx)
