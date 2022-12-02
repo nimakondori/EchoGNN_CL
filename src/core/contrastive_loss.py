@@ -73,7 +73,7 @@ class ContrastiveLoss(nn.Module):
                                                      custom_margin=custom_margin)
 
                 # Since d_positive and d_negative are mean values, they should be on the same scale
-                loss += torch.clamp(d_positive - d_negative, min=0.0).mean()
+                loss += torch.clamp(d_positive/2 - d_negative, min=0.0).mean()
 
         return loss/batch_size
 
