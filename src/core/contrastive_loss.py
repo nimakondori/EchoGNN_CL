@@ -69,12 +69,13 @@ class ContrastiveLoss(nn.Module):
                     target_idx=adj_es_emb_idx)
 
                 d_negative = self.calculate_distance(anchor=embeddings[i*num_clips_per_video + j, ed_embedding_col],
-                                                     target=embeddings[i*num_clips_per_video + j, es_embedding_col])
+                                                     target=embeddings[i*num_clips_per_video + j, es_embedding_col],
+                                                     custom_margin=custom_margin)
 
                 # Since d_positive and d_negative are mean values, they should be on the same scale
-                loss += torch.clamp(custom_margin + d_positive - d_negative, min=0.0).mean()
+                loss += torch.clamp(d_positive - d_negative, min=0.0).mean()
 
-        return loss
+        return loss/batch_size
 
     def distance(self, a: Tensor, b: Tensor):
         diff = torch.abs(a - b)
@@ -106,7 +107,7 @@ class ContrastiveLoss(nn.Module):
         # only return the idx rather than the array
         return np.where(anchor_idx == frame_idx)[0][0]
 
-    def calculate_distance(self, anchor: Tensor, target: Tensor):
+    def calculate_distance(self, anchor: Tensor, target: Tensor, custom_margin: float):
         distance = 0
 
         distance += self.distance(a=F.normalize(anchor, p=2, dim=0),

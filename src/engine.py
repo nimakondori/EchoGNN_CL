@@ -578,7 +578,7 @@ class Engine(object):
                             save_umap_plots(reduced_emb[:, 0], reduced_emb[:, 1], labels=labels[n],
                                             title=f"epoch{epoch + 1}_fig{n}", save_path="umaps",
                                             ed_color=ed_color, es_color=es_color, step_value=epoch,
-                                            save_to_wandb=save_to_wandb, epoch=epoch)
+                                            save_to_wandb=save_to_wandb)
                             umap_saved = True
 
                 # size is 1 during evaluation

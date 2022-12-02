@@ -862,7 +862,6 @@ def save_umap_plots(x: list,
                     y: list,
                     labels: list,
                     save_path: str,
-                    epoch: int,
                     title: str = None,
                     xlabel: str = None,
                     ylabel: str = None,
@@ -892,8 +891,7 @@ def save_umap_plots(x: list,
     ax.legend()
     if save_to_wandb:
         wandb.log({f'{mode}/vis': fig,
-                   f'{mode}/{title}': step_value},
-                  step=epoch)
+                   f'{mode}/{title}': step_value})
     else:
         plt.savefig(os.path.join(path, title)+".png")
     plt.clf()
