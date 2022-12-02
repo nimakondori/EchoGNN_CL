@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch import nn
+from torch import nn, Tensor
 import torch.nn.functional as F
 
 
@@ -23,19 +23,25 @@ class ContrastiveLoss(nn.Module):
         self.es_adj_count = es_adj_count
 
     def forward(self, data, embeddings, batch_size=3, num_clips_per_video=3, custom_margin=None):
-        d_positive = torch.tensor(0., device=data.ed_frame.device)
-        d_negative = torch.tensor(0., device=data.ed_frame.device)
+        loss = torch.tensor(0., device=data.ed_frame.device)
+        # custome margin is the volume based distance factor of ED and ES
+        if custom_margin is None:
+            custom_margin = self.default_margin
+        else:
+            custom_margin[custom_margin > 1] = 1      #For volume contrastive loss, constrain margin to less than 1
 
         for i in range(0, batch_size):
-            if batch_size==num_clips_per_video==1:
-                pass
             ed_frame = data[i].ed_frame.item()
             es_frame = data[i].es_frame.item()
             for j in range(num_clips_per_video):
-
-                frame_idx = data[i].frame_idx[j] if len(data[i].frame_idx[j].shape) > 1 \
+                d_positive = torch.tensor(0., device=data.ed_frame.device)
+                d_negative = torch.tensor(0., device=data.ed_frame.device)
+                # This differentiates between frame_idx shape of (64, ) and other shapes
+                frame_idx = data[i].frame_idx[j] if len(data[i].frame_idx.shape) > 1 \
                                                     else data[i].frame_idx
-                if ed_frame not in data[i].frame_idx or es_frame not in frame_idx:
+
+                # We skip the clips that don't include both ED and ES frames
+                if ed_frame not in frame_idx or es_frame not in frame_idx:
                     continue
 
                 # indices of the adjacent frames to ED
@@ -65,18 +71,12 @@ class ContrastiveLoss(nn.Module):
                 d_negative = self.calculate_distance(anchor=embeddings[i*num_clips_per_video + j, ed_embedding_col],
                                                      target=embeddings[i*num_clips_per_video + j, es_embedding_col])
 
-        # assert  outputED.shape[1:] == (128,2)
-        if custom_margin is None:
-            custom_margin = self.default_margin
-        else:
-            custom_margin[custom_margin > 1] = 1      #For volume contrastive loss, constrain margin to less than 1
-        # d_positive, d_negative = 0, 0
+                # Since d_positive and d_negative are mean values, they should be on the same scale
+                loss += torch.clamp(custom_margin + d_positive - d_negative, min=0.0).mean()
 
-        loss = torch.clamp(custom_margin + d_positive - 0.001*d_negative, min=0.0).mean()
-        # print('d_positive d_negative', d_positive, d_negative)
         return loss
 
-    def distance(self, a, b, channel_dim=1):
+    def distance(self, a: Tensor, b: Tensor):
         diff = torch.abs(a - b)
         return torch.pow(diff, 2).sum()
 
@@ -99,26 +99,26 @@ class ContrastiveLoss(nn.Module):
         max_idx = min(anchor_idx + count, end_frame)
         col_idx = np.where((frame_idx >= min_idx) & (frame_idx <= max_idx) & (frame_idx != anchor_idx))
         # remove the data information and return
-        return [col[0] for col in col_idx]
+        return col_idx[0]
 
     @staticmethod
     def get_anchor_idx_from_clip(frame_idx: list, anchor_idx: int) -> list:
         # only return the idx rather than the array
         return np.where(anchor_idx == frame_idx)[0][0]
 
-    def calculate_distance(self, anchor: torch.tensor, target: torch.tensor):
+    def calculate_distance(self, anchor: Tensor, target: Tensor):
         distance = 0
-        for embedding in target:
-            distance += self.distance(a=anchor, b=embedding)
-        return distance / len(target)
 
-    def calculate_distance2(self, embeddings: torch.tensor, anchor_idx: tuple, target_idx: list):
-        # out_embedED, out_embedES = F.normalize(out_featureED, p=2, dim=1), F.normalize(out_featureES, p=2, dim=1)
+        distance += self.distance(a=F.normalize(anchor, p=2, dim=0),
+                                  b=F.normalize(target, p=2, dim=0))
+        return distance.mean()
+
+    def calculate_distance2(self, embeddings: Tensor, anchor_idx: tuple, target_idx: list):
         distance = 0
         # This function is called on each j so the row of the embeddings and the anchor is the same
         target_row = anchor_idx[0]
         for col in target_idx:
-            distance += self.distance(a=F.normalize(embeddings[anchor_idx],p=2, dim=0),
+            distance += self.distance(a=F.normalize(embeddings[anchor_idx], p=2, dim=0),
                                       b=F.normalize(embeddings[target_row, col], p=2, dim=0))
         # return the average to keep the scale of negative and positive distances the same
         return distance / len(target_idx)
