@@ -72,7 +72,7 @@ class ContrastiveLoss(nn.Module):
                                                      target=embeddings[i*num_clips_per_video + j, es_embedding_col],
                                                      custom_margin=custom_margin)
 
-                # Since d_positive and d_negative are mean values, they should be on the same scale
+                # d_positive / 2 since it is being added from 2 sources as opposed to d_negative
                 loss += torch.clamp(d_positive/2 - d_negative, min=0.0).mean()
 
         return loss/batch_size
