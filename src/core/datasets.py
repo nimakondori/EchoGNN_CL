@@ -94,6 +94,10 @@ class EchoNetEfDataset(Dataset, ABC):
         self.es_frames = torch.tensor(np.array(filelist_df['ESFrame']), dtype=torch.int32)
         self.ed_frames = torch.tensor(np.array(filelist_df['EDFrame']), dtype=torch.int32)
 
+        # Extract ESV and EDV volumes
+        self.esv = torch.tensor(np.array(filelist_df['ESV']), dtype=torch.float32)
+        self.edv = torch.tensor(np.array(filelist_df['EDV']), dtype=torch.float32)
+
         # Extract video file names
         filenames = np.array(filelist_df['FileName'].tolist())
 
@@ -193,6 +197,8 @@ class EchoNetEfDataset(Dataset, ABC):
         g.classification_y = classification_label
         g.es_frame = self.es_frames[idx]
         g.ed_frame = self.ed_frames[idx]
+        g.edv = self.edv[idx]
+        g.esv = self.esv[idx]
         g.vid_dir = self.patient_data_dirs[idx]
         g.frame_idx = frame_idx
 

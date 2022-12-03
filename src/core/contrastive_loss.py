@@ -16,29 +16,33 @@ class ContrastiveLoss(nn.Module):
     The positive pairs are the  ES pair and the ED pair.
     The negative pairs are the A4C pair and the A2C pair.
     """
-    def __init__(self, default_margin=1, ed_adj_count=2, es_adj_count=3):
+
+    def __init__(self, default_margin=1, ed_adj_count=2, es_adj_count=3, volume_distance=False, volume_scaling=200):
         super().__init__()
         self.default_margin = default_margin
         self.ed_adj_count = ed_adj_count
         self.es_adj_count = es_adj_count
+        self.volume_scaling = volume_scaling
+        self.volume_distance = volume_distance
 
-    def forward(self, data, embeddings, batch_size=3, num_clips_per_video=3, custom_margin=None):
+    def forward(self, data, embeddings, batch_size=3, num_clips_per_video=3):
         loss = torch.tensor(0., device=data.ed_frame.device)
-        # custome margin is the volume based distance factor of ED and ES
-        if custom_margin is None:
-            custom_margin = self.default_margin
-        else:
-            custom_margin[custom_margin > 1] = 1      #For volume contrastive loss, constrain margin to less than 1
 
         for i in range(0, batch_size):
             ed_frame = data[i].ed_frame.item()
             es_frame = data[i].es_frame.item()
+            edv = data[i].edv.item()
+            esv = data[i].esv.item()
+
+            # custom margin is the volume based distance factor of ED and ES
+            custom_margin = (edv - esv) / self.volume_scaling if self.volume_distance else 0
+
             for j in range(num_clips_per_video):
                 d_positive = torch.tensor(0., device=data.ed_frame.device)
                 d_negative = torch.tensor(0., device=data.ed_frame.device)
                 # This differentiates between frame_idx shape of (64, ) and other shapes
                 frame_idx = data[i].frame_idx[j] if len(data[i].frame_idx.shape) > 1 \
-                                                    else data[i].frame_idx
+                    else data[i].frame_idx
 
                 # We skip the clips that don't include both ED and ES frames
                 if ed_frame not in frame_idx or es_frame not in frame_idx:
@@ -68,18 +72,18 @@ class ContrastiveLoss(nn.Module):
                     anchor_idx=(j, es_embedding_col),
                     target_idx=adj_es_emb_idx)
 
-                d_negative = self.calculate_distance(anchor=embeddings[i*num_clips_per_video + j, ed_embedding_col],
-                                                     target=embeddings[i*num_clips_per_video + j, es_embedding_col],
+                d_negative = self.calculate_distance(anchor=embeddings[i * num_clips_per_video + j, ed_embedding_col],
+                                                     target=embeddings[i * num_clips_per_video + j, es_embedding_col],
                                                      custom_margin=custom_margin)
 
                 # d_positive / 2 since it is being added from 2 sources as opposed to d_negative
-                loss += torch.clamp(d_positive/2 - d_negative, min=0.0).mean()
+                loss += torch.clamp(d_positive / 2 - d_negative, min=0.0).mean()
 
-        return loss/batch_size
+        return loss / batch_size
 
-    def distance(self, a: Tensor, b: Tensor):
+    def distance(self, a: Tensor, b: Tensor, custom_margin=0):
         diff = torch.abs(a - b)
-        return torch.pow(diff, 2).sum()
+        return (torch.pow(diff, 2)).sum() + custom_margin
 
     def get_adj_embedding_indices(self, frame_idx: list, anchor_idx: int, count: int):
         """
@@ -111,7 +115,8 @@ class ContrastiveLoss(nn.Module):
         distance = 0
 
         distance += self.distance(a=F.normalize(anchor, p=2, dim=0),
-                                  b=F.normalize(target, p=2, dim=0))
+                                  b=F.normalize(target, p=2, dim=0),
+                                  custom_margin=custom_margin)
         return distance.mean()
 
     def calculate_distance2(self, embeddings: Tensor, anchor_idx: tuple, target_idx: list):

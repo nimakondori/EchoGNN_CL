@@ -14,7 +14,7 @@ train:
   umap:
     visualize: True
     # How often should the plots be saved
-    epochs: 1
+    epochs: 2
     ed_count: 3
     es_count: 5
     ed_color: r
@@ -54,10 +54,11 @@ train:
 #     Contrastive Loss to encourage informed embeddings
     contrastive:
       name: contrastive
-      lambda: 0.0001
-      ed_adj_count: 3
-      es_adj_count: 5
-#      margin: 0.025
+      lambda: 0.001
+      ed_adj_count: 1
+      es_adj_count: 3
+      volume_scaling: 200
+      volume_distance: True
 
   # Training optimizer configs
   optimizer:
