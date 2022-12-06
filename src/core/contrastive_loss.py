@@ -77,13 +77,13 @@ class ContrastiveLoss(nn.Module):
                                                      custom_margin=custom_margin)
 
                 # d_positive / 2 since it is being added from 2 sources as opposed to d_negative
-                loss += torch.clamp(d_positive / 2 - d_negative, min=0.0).mean()
+                loss += torch.clamp(custom_margin + d_positive / 2 - d_negative, min=0.0).mean()
 
         return loss / batch_size
 
-    def distance(self, a: Tensor, b: Tensor, custom_margin=0):
+    def distance(self, a: Tensor, b: Tensor):
         diff = torch.abs(a - b)
-        return (torch.pow(diff, 2)).sum() + custom_margin
+        return (torch.pow(diff, 2)).sum()
 
     def get_adj_embedding_indices(self, frame_idx: list, anchor_idx: int, count: int):
         """
@@ -115,8 +115,7 @@ class ContrastiveLoss(nn.Module):
         distance = 0
 
         distance += self.distance(a=F.normalize(anchor, p=2, dim=0),
-                                  b=F.normalize(target, p=2, dim=0),
-                                  custom_margin=custom_margin)
+                                  b=F.normalize(target, p=2, dim=0))
         return distance.mean()
 
     def calculate_distance2(self, embeddings: Tensor, anchor_idx: tuple, target_idx: list):
