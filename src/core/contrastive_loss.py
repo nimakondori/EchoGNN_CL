@@ -77,7 +77,7 @@ class ContrastiveLoss(nn.Module):
                                                      custom_margin=custom_margin)
 
                 # d_positive / 2 since it is being added from 2 sources as opposed to d_negative
-                loss += torch.clamp(custom_margin + d_positive / 2 - d_negative, min=0.0).mean()
+                loss += torch.clamp(custom_margin + d_positive - d_negative, min=0.0).mean()
 
         return loss / batch_size
 
@@ -116,7 +116,7 @@ class ContrastiveLoss(nn.Module):
 
         distance += self.distance(a=F.normalize(anchor, p=2, dim=0),
                                   b=F.normalize(target, p=2, dim=0))
-        return distance.mean()
+        return distance
 
     def calculate_distance2(self, embeddings: Tensor, anchor_idx: tuple, target_idx: list):
         distance = 0
