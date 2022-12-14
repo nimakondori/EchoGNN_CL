@@ -838,6 +838,18 @@ def print_es_ed_dist_summary(ed_summary_dict: dict,
 
 
 def get_labels_from_idx(frame_idx: list, ed_idx: int, es_idx: int, ed_count: int, es_count: int):
+    """
+    Generates the labels needed for the umap visualization
+
+    :param frame_idx: list, a list of frame indices in the video clips extracted from the video
+    :param ed_idx: int, index of the ED frame withing the clip
+    :param es_idx: int, index of the ES frame withing the clip
+    :param ed_count: int, index of the ES frame withing the clip
+    :param es_count: int, index of the ES frame withing the clip
+
+    :return: a list of labels for each video clip showing ED and ES neighboring frames
+    """
+
     labels = np.zeros_like(frame_idx)
     for i in range(len(frame_idx)):
         ed_loc = np.where(frame_idx[i] == ed_idx)
@@ -848,14 +860,6 @@ def get_labels_from_idx(frame_idx: list, ed_idx: int, es_idx: int, ed_count: int
             labels[i][es_loc[0][0] - es_count: es_loc[0][0] + es_count] = 2
 
         return np.array(labels)
-
-
-def get_labels_from_idx_2(frame_idx: list, ed_idx: int, es_idx: int, ed_count: int, es_count: int):
-    labels = np.zeros_like(frame_idx)
-    for i in range(len(frame_idx)):
-        labels[ed_idx - ed_count <= frame_idx[i] <= ed_idx + ed_count] = 1
-        labels[es_idx - es_count <= frame_idx[i] <= es_idx + es_count] = 2
-    return labels
 
 
 def save_umap_plots(x: list,
@@ -870,10 +874,27 @@ def save_umap_plots(x: list,
                     ed_color: str = 'r',
                     es_color: str = 'b',
                     save_to_wandb: bool = True):
+    """
+    Creates the umap plot
+
+    :param x: list, list of reduced embedding first dimension
+    :param y: list, list of reduced embedding second dimension
+    :param labels: list, list of labels for each pair of (x,y)
+    :param save_path: str, path to save the umap plot if save_to_wandb = False
+    :param title: str, title of the plot
+    :param xlabel: str, label of the x-axis
+    :param ylabel: str, title of the y-axis
+    :param step_value: int, epoch number
+    :param mode: str, phase that
+    :param ed_color: str, color of the ED embeddings on the plot
+    :param es_color: str, color of the ES embeddings on the plot
+    :param save_to_wandb: bool, whether to save the plot in wandb or not
+
+    """
+
     # Create directory to save visualizations to
     path = os.path.join(save_path)
     os.makedirs(path, exist_ok=True)
-    # fig = plt.Figure()
     fig, ax = plt.subplots()
     if xlabel is not None:
         plt.xlabel(xlabel)
@@ -881,10 +902,6 @@ def save_umap_plots(x: list,
         plt.ylabel(ylabel)
     if title is not None:
         plt.title(title)
-    # Define different colors for the frames
-    # plt.scatter(x[labels == 0], y[labels == 0], c='m', label="N/A")
-    # plt.scatter(x[labels == 1], y[labels == 1], c=ed_color, label="ED")
-    # plt.scatter(x[labels == 2], y[labels == 2], c=es_color, label="ES")
     ax.scatter(x[labels == 0], y[labels == 0], c='m', label="N/A")
     ax.scatter(x[labels == 1], y[labels == 1], c=ed_color, label="ED")
     ax.scatter(x[labels == 2], y[labels == 2], c=es_color, label="ES")

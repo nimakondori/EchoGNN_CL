@@ -4,28 +4,49 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 
 
-# The Contrastive Loss implementation is taken from https://github.com/LishinC/VCN
+# The Contrastive Loss implementation based on https://github.com/LishinC/VCN
 class ContrastiveLoss(nn.Module):
     """
-    TODO update this text
-    Phase contrastive loss / Volume contrastive loss if custom_margin assigned
-    accepts model 2 outputs (ED & ES), both of shape [B, embed_dim=128, 2].
-    The 2nd-dimension contains the N-dimensional vector embeddings for frames,
-    namely A4C ED, A2C ED in the first array; A4C ES, A2C ES in the second array.
-    The loss encourage similar embeddings for the same phase, regardless of view.
-    The positive pairs are the  ES pair and the ED pair.
-    The negative pairs are the A4C pair and the A2C pair.
+    ContrastiveLoss class implements the loss on the given anchors (ED and ES) frames
+    and their neighboring frames, caculates the loss and returns the result
+
+    Attributes
+    ----------
+    ed_adj_count: int, the number of ed neighboring frames to cluster
+    es_adj_count: int, the number of es neighboring frames to cluster
+    volume_distance : bool, if we should apply volumetric margin or not
+    volume_scaling: int, the scaling factor to center the data around a target
+
+    Methods
+    -------
+    forward(self, data, embeddings, batch_size, num_clips_per_video): calculates the loss per batch
+    distance(self, a: Tensor, b: Tensor): calculates the norm squared distance between 2 vectors
+    get_adj_embedding_indices(self, frame_idx: list, anchor_idx: int, count: int): finds the indices around the
+    anchor frame based on indices in frame indices in each clip
+    get_anchor_idx_from_clip(frame_idx: list, anchor_idx: int): returns the index of the anchor within a video clip
+    calculate_distance(self, anchor: Tensor, target: Tensor, custom_margin: float): calculate the distance between
+    clusters (d_neg)
+    calculate_distance2(self, embeddings: Tensor, anchor_idx: tuple, target_idx: list): calculate the distance between
+    the anchor and the neighboring frames (d_pos)
+
     """
 
-    def __init__(self, default_margin=1, ed_adj_count=2, es_adj_count=3, volume_distance=False, volume_scaling=200):
+    def __init__(self,
+                 ed_adj_count: int = 2,
+                 es_adj_count: int = 3,
+                 volume_distance: bool = False, volume_scaling: int = 200):
         super().__init__()
-        self.default_margin = default_margin
         self.ed_adj_count = ed_adj_count
         self.es_adj_count = es_adj_count
         self.volume_scaling = volume_scaling
         self.volume_distance = volume_distance
 
-    def forward(self, data, embeddings, batch_size=3, num_clips_per_video=3):
+    def forward(self,
+                data,
+                embeddings,
+                batch_size=3,
+                num_clips_per_video=3):
+
         loss = torch.tensor(0., device=data.ed_frame.device)
 
         for i in range(0, batch_size):
@@ -82,17 +103,26 @@ class ContrastiveLoss(nn.Module):
         return loss / batch_size
 
     def distance(self, a: Tensor, b: Tensor):
+        """
+        Calculates the distance between the input vectors
+
+        :param a: torch.Tensor, input vector 1
+        :param b: torch.Tensor, input vector 2
+
+        :returns: norm squared between the input vectors
+        """
         diff = torch.abs(a - b)
         return (torch.pow(diff, 2)).sum()
 
     def get_adj_embedding_indices(self, frame_idx: list, anchor_idx: int, count: int):
         """
-        Returns the indices of the adj frames of an anchor frame in the frame_idx
+        Finds the location of the neighboring indices of the anchor within video clip
 
         :param frame_idx: list, list of frame indices for each clip
         :param anchor_idx: int, index of the anchor frame whose neighbors are gathered
         :param count: int, the number of frames on each side of the anchor frame to gather
 
+        :return: the indices of the adj frames of an anchor frame in the frame_idx
         """
 
         # check whether if labeled ED or ES frame exist in the miniclip
@@ -108,10 +138,27 @@ class ContrastiveLoss(nn.Module):
 
     @staticmethod
     def get_anchor_idx_from_clip(frame_idx: list, anchor_idx: int) -> list:
+        """
+        Finds the location of the anchor withing a video clip
+
+        :param frame_idx: list, list of frame indices for each clip
+        :param anchor_idx: int, index of the anchor frame whose neighbors are gathered
+
+        :return: the index of the anchor frame withing each video clip
+        """
+
         # only return the idx rather than the array
         return np.where(anchor_idx == frame_idx)[0][0]
 
-    def calculate_distance(self, anchor: Tensor, target: Tensor, custom_margin: float):
+    def calculate_distance(self, anchor: Tensor, target: Tensor):
+        """
+        Calculate the distance between 2  clusters by finding the distance between the 2 anchors
+
+         :param anchor: torch.Tensor, anchor frame embedding which is the ED frame
+         :param target: torch.Tensor, target frame embedding which is the ES frame
+
+         :returns: the distance between 2 cluster
+         """
         distance = 0
 
         distance += self.distance(a=F.normalize(anchor, p=2, dim=0),
@@ -119,6 +166,15 @@ class ContrastiveLoss(nn.Module):
         return distance
 
     def calculate_distance2(self, embeddings: Tensor, anchor_idx: tuple, target_idx: list):
+        """
+        Finds the average distance of positive samples and the anchor
+
+         :param embeddings: torch.Tensor, a tensor including the embeddings of a video clip
+         :param anchor_idx: tuple, index of the anchor withing the video clip
+         :param target_idx: list, indices of the target frames which are the neighboring frames
+
+         :returns: the average distance between the neighboring frames and the anchor frame
+         """
         distance = 0
         # This function is called on each j so the row of the embeddings and the anchor is the same
         target_row = anchor_idx[0]
