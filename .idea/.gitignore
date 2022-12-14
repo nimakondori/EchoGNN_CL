@@ -1,0 +1,6 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+/wandb/*
+/trained_models/test_train/*
+**/__pycache__

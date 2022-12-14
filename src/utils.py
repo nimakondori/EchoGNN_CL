@@ -336,7 +336,7 @@ def save_echo_graph_bar_plot(title: str,
 
     # Save figure
     if loss is not None:
-        fig.savefig(os.path.join(path, str(clip_num) + '_loss_'+str(loss) + '_' + title + '_histogram.jpg'))
+        fig.savefig(os.path.join(path, str(clip_num) + '_loss_' + str(loss) + '_' + title + '_histogram.jpg'))
     else:
         fig.savefig(os.path.join(path, str(clip_num) + '_' + title + '_histogram.jpg'))
 
@@ -414,6 +414,13 @@ def wandb_log(phase: str,
                   step=epoch)
 
 
+def wandb_draw_plots(fig: plt.Figure, plot_name):
+    if fig is not None or plot_name is not None:
+        wandb.log({plot_name: fig})
+    else:
+        return
+
+
 def draw_ef_plots(predictions: numpy.ndarray,
                   labels: numpy.ndarray,
                   experiment_name: str,
@@ -469,7 +476,7 @@ def draw_ef_plots(predictions: numpy.ndarray,
     conf_mat = conf_mat / np.sum(conf_mat, axis=0)
     sn.heatmap(conf_mat, annot=True, xticklabels=['<30%', '30%<=EF<40%', '40%<=EF<55%', '55%<='],
                yticklabels=['<30%', '30%<=EF<40%', '40%<=EF<55%', '55%<='])
-    plt.savefig(os.path.join(path, 'confusion_mat_'+str(figure_num)+'.png'))
+    plt.savefig(os.path.join(path, 'confusion_mat_' + str(figure_num) + '.png'))
 
     plt.close()
 
@@ -502,7 +509,7 @@ def compute_ed_frame_distance(ed_frame_true: int,
     """
 
     assert weights_to_use in ['incoming_edge', 'outgoing_edge', 'node'], "weights_to_use must be one of" \
-                                                                                  "[incoming_edge, outgoing_edge, node]"
+                                                                         "[incoming_edge, outgoing_edge, node]"
 
     num_clips = len(frame_idx)
 
@@ -535,7 +542,7 @@ def compute_ed_frame_distance(ed_frame_true: int,
     # to capture the cycle
     if es_frame_true in clip_frame_idx and es_frame_true > ed_frame_true:
         clip_es_idx = np.where(clip_frame_idx == es_frame_true)[0][0]
-        if np.count_nonzero(binary_weights[clip_ed_idx+1: clip_es_idx] == 1) == 0:
+        if np.count_nonzero(binary_weights[clip_ed_idx + 1: clip_es_idx] == 1) == 0:
             summary_dict['num_failures'] += 1
             return
 
@@ -635,7 +642,6 @@ def compute_es_frame_distance(ed_frame_true: int,
                               weights_to_use: str = 'outgoing_edge',
                               adj: torch.tensor = None,
                               frame_weights: torch.tensor = None):
-
     assert weights_to_use in ['incoming_edge', 'outgoing_edge', 'node'], "weights_to_use must be one of" \
                                                                          "[incoming_edge, outgoing_edge, node]"
 
@@ -670,7 +676,7 @@ def compute_es_frame_distance(ed_frame_true: int,
     # to capture the cycle
     if ed_frame_true in clip_frame_idx and es_frame_true > ed_frame_true:
         clip_ed_idx = np.where(clip_frame_idx == ed_frame_true)[0][0]
-        if np.count_nonzero(binary_weights[clip_ed_idx+1: clip_es_idx] == 1) == 0:
+        if np.count_nonzero(binary_weights[clip_ed_idx + 1: clip_es_idx] == 1) == 0:
             summary_dict['num_failures'] += 1
             return
 
@@ -703,7 +709,7 @@ def compute_es_frame_distance(ed_frame_true: int,
             # If there are no 1's after the ED frame in the previous clip, the model has failed to capture the cycle
             if ed_frame_true in frame_idx[prev_clip_idx]:
                 clip_ed_idx = np.where(frame_idx[prev_clip_idx] == ed_frame_true)[0][0]
-                if np.count_nonzero(binary_weights[clip_ed_idx+1:] == 1) == 0:
+                if np.count_nonzero(binary_weights[clip_ed_idx + 1:] == 1) == 0:
                     summary_dict['num_failures'] += 1
                     return
 
@@ -829,3 +835,82 @@ def print_es_ed_dist_summary(ed_summary_dict: dict,
     logger.info("ES Num All Ones: {}".format(es_summary_dict['num_all_ones']))
     logger.info("ED Num All Zeros: {}".format(ed_summary_dict['num_all_zeros']))
     logger.info("ES Num All Zeros: {}".format(es_summary_dict['num_all_zeros']))
+
+
+def get_labels_from_idx(frame_idx: list, ed_idx: int, es_idx: int, ed_count: int, es_count: int):
+    """
+    Generates the labels needed for the umap visualization
+
+    :param frame_idx: list, a list of frame indices in the video clips extracted from the video
+    :param ed_idx: int, index of the ED frame withing the clip
+    :param es_idx: int, index of the ES frame withing the clip
+    :param ed_count: int, index of the ES frame withing the clip
+    :param es_count: int, index of the ES frame withing the clip
+
+    :return: a list of labels for each video clip showing ED and ES neighboring frames
+    """
+
+    labels = np.zeros_like(frame_idx)
+    for i in range(len(frame_idx)):
+        ed_loc = np.where(frame_idx[i] == ed_idx)
+        es_loc = np.where(frame_idx[i] == es_idx)
+        if ed_loc[0]:
+            labels[i][ed_loc[0][0] - ed_count: ed_loc[0][0] + ed_count] = 1
+        if es_loc[0]:
+            labels[i][es_loc[0][0] - es_count: es_loc[0][0] + es_count] = 2
+
+        return np.array(labels)
+
+
+def save_umap_plots(x: list,
+                    y: list,
+                    labels: list,
+                    save_path: str,
+                    title: str = None,
+                    xlabel: str = None,
+                    ylabel: str = None,
+                    step_value: int = 1,
+                    mode: str = "batch_train",
+                    ed_color: str = 'r',
+                    es_color: str = 'b',
+                    save_to_wandb: bool = True):
+    """
+    Creates the umap plot
+
+    :param x: list, list of reduced embedding first dimension
+    :param y: list, list of reduced embedding second dimension
+    :param labels: list, list of labels for each pair of (x,y)
+    :param save_path: str, path to save the umap plot if save_to_wandb = False
+    :param title: str, title of the plot
+    :param xlabel: str, label of the x-axis
+    :param ylabel: str, title of the y-axis
+    :param step_value: int, epoch number
+    :param mode: str, phase that
+    :param ed_color: str, color of the ED embeddings on the plot
+    :param es_color: str, color of the ES embeddings on the plot
+    :param save_to_wandb: bool, whether to save the plot in wandb or not
+
+    """
+
+    # Create directory to save visualizations to
+    path = os.path.join(save_path)
+    os.makedirs(path, exist_ok=True)
+    fig, ax = plt.subplots()
+    if xlabel is not None:
+        plt.xlabel(xlabel)
+    if ylabel is not None:
+        plt.ylabel(ylabel)
+    if title is not None:
+        plt.title(title)
+    ax.scatter(x[labels == 0], y[labels == 0], c='m', label="N/A")
+    ax.scatter(x[labels == 1], y[labels == 1], c=ed_color, label="ED")
+    ax.scatter(x[labels == 2], y[labels == 2], c=es_color, label="ES")
+    ax.legend()
+    if save_to_wandb:
+        wandb.log({f'{mode}/vis': fig,
+                   f'{mode}/{title}': step_value},
+                  step=step_value)
+    else:
+        plt.savefig(os.path.join(path, title)+".png")
+    plt.clf()
+    plt.close()

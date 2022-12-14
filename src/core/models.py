@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -240,9 +242,9 @@ class Custom3DConv(nn.Module):
     """
 
     def __init__(self,
-                 out_channels: list[int] = None,
-                 kernel_sizes: list[int] = None,
-                 pool_sizes: list[int] = None,
+                 out_channels: List[int] = None,
+                 kernel_sizes: List[int] = None,
+                 pool_sizes: List[int] = None,
                  output_dim: int = 128,
                  cnn_dropout_p: float = 0):
         """
