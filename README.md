@@ -1,27 +1,35 @@
-# EchoGNN: Explainable Ejection Fraction Estimation with Graph Neural Networks
+# EchoGNN with Contrastive Learning
 
-Official PyTorch implementation for:
-
-Masoud Mokhtari, Teresa Tsang, Purang Abolmaesumi, and Renjie Liao, [EchoGNN: Explainable Ejection Fraction Estimation with Graph Neural Networks](https://www.researchgate.net/publication/363128753_EchoGNN_Explainable_Ejection_Fraction_Estimation_with_Graph_Neural_Networks) (MICCAI 2022)
+EECE 571F course project by Nima Kondori, Jamie Goco, and Andrea Fung
 
 ## Abstract
-Ejection fraction (EF) is a key indicator of cardiac function, allowing identification of patients prone to heart dysfunctions such as heart failure. EF is estimated from cardiac ultrasound videos known as echocardiograms (echo) by manually tracing the left ventricle and estimating its volume on certain frames. These estimations exhibit high inter-observer variability due to the manual process and varying video quality. Such sources of inaccuracy and the need for rapid assessment necessitate the need for reliable and explainable machine learning techniques. In this work, we introduce EchoGNN, a model based on graph neural networks (GNNs) to estimate EF from echo videos. Our model first infers a latent echo-graph from the frames of one or multiple echo cine series. It then estimates weights over nodes and edges of this graph, indicating the importance of individual frames that aid EF estimation. A GNN regressor uses this weighted graph to predict EF. We show, qualitatively and quantitatively, that the learned graph weights provide explainability through identification of critical frames for EF estimation, which can be used to determine when human intervention is required. On EchoNet-Dynamic public EF dataset, EchoGNN achieves EF prediction performance that is on par with state of the art and provides explainability, which is crucial given the high inter-observer variability inherent in this task.
+Ejection fraction (EF) is a key metric used to assess the systolic performance of the left ventricle of the heart. Within recent years, many deep learning models have been developed to help automate the estimation of EF from echocardiograms. Among these works includes EchoGNN, a model based on Graph Neural Networks (GNNs) from Mokhtari \etal that aimed to provide an explainable EF estimation. However, EchoGNN acts as a skeleton implementation of GNNs in EF estimation applications and can therefore be further developed and improved on. One such improvement involves further investigation into the randomness of the embeddings EchoGNN generates and whether the EF estimation accuracy would improve if EchoGNN is given better embeddings. Recent works using contrastive learning to produce more informed embeddings have shown a lot of success in many areas of deep learning including medical applications. Therefore, our project shows how the integration of contrastive learning in a semi-supervised manner increases EchoGNN's accuracy of EF estimation.
+
+The original EchoGNN by Masoud Mokhtari et al. can be found [here](https://github.com/DSL-Lab/echognn)
 
 <p align="center">
-  <img alt="EchoGNN overall architecture" src="./echognn.PNG" width="700"/>
+  <img alt="EchoGNN with contrastive learning" src="./EchoGNN_CL.png" width="700"/>
 </p>
 
-## Reproducing MICCAI 2022 Results
-To reproduce the exact results reported in our MICCAI 2022 submission, follow the steps below:
-1. Install the required packages by following the instructions in Section [Requirements](#requirements)
-2. Download the dataset as mentioned in Section [Dataset](#dataset).
-3. Use the instructions in Section [Preprocessing](#preprocessing) to preprocess EchoNet's CSV file.
-4. In the default.yaml config file provided in the configs/ directory, add the path to your dataset to dataset.dataset_path
-5. Please ensure that in the config file, the path to the trained model is specified as ./trained_models/miccai2022.pth (under model.checkpoint_path)
-6. Run the following command:
-```
-python run.py --config_path ./configs/default.yaml --test"
-```
+## Contrastive Loss
+
+The contrastive loss we implement aims to repel and distance dissimilar frames (ED and ES) in the resultant embedding space, while clustering together frames around the labeled ED and ES (neighbors).
+
+<p align="center">
+  <img alt="Contrastive loss illustration" src="./CL_Illustration.png" width="700"/>
+</p>
+
+The loss function is as follows:
+
+<p align="center">
+  <img alt="Contrastive loss function" src="./Loss_Function.png" width="250"/>
+</p>
+
+where:
+- N is the number of samples in the batch
+- d_pos is the average distance between the anchors (labeled ED and ES frames) and positive samples (neighboring frames)
+- d_neg is the normalized distance between the anchor (labeled ED frame) and the negative sample (labeled ES frame)
+- volumetric margin, where EDVi and ESVi are the ED and ES volumes respectively and β = 200 is the scaling hyperparameter.
 
 ## Requirements
 To install the requirements (preferably in a virtual env), run the following command:
@@ -37,56 +45,14 @@ pip install prettytable
 ## Dataset
 EchoNet-Dynamic public EF dataset is used for this project. This dataset can be accessed
 [here](https://echonet.github.io/dynamic/index.html).
-Feel free to download the dataset in any convenient location and provide its directory in the config file as described 
-in Section [Config File](#config-file)
 
-## Preprocessing 
-Since ES/ED frame locations are used to assess model's performance, we need to have this information in the CSV file 
-used by the dataset. To add columns for the frame locations to the originally provided FileList.csv, the 
-_echonet_preprocess_csc.py_ script located under /scripts can be used:
-```
-python echonet_preprocess_csv.py --data_csv_path <path_to_FileList.csv> --tracing_csv_path <path_to_VolumeTracings.csv> --output_dir <path_to_output_csv>
-```
-The original FileList.csv file can now be replaced by the output csv file generated by the script.
-
-## Pretraining
-To pretrain the model with the task of finding ED/ES frame locations: create a pretraining configuration yaml file 
-similar to /configs/pretrain_default.yaml and run the following command:
-```
-python run.py --config_path <path_to_pretraining_config> --save_dir <path_to_save_models_to> --pretrain
-```
 
 ## Training
-To train the model (training + validation): first, create a training configuration yaml file 
-similar to /configs/default.yaml. second, if you desire to use pretrained models obtained by following the instructions in 
-[Pretraining](#pretraining), use the pretrained_path option in the config file to specify the path to pretrained models.
-lastly, run the following command:
 ```
 python run.py --config_path <path_to_training_config> --save_dir <path_to_save_models_to>
 ```
 
 ## Evaluation
-To evaluate an already trained model: first, create a training configuration yaml file 
-similar to /configs/default.yaml that matches the specifications of the trained models. Second, provide the path to trained
-models using the checkpoint_path option in the config file. Lasly, run the following command:
 ```
 python run.py --config_path <path_to_training_config> --test
 ```
-
-## Config File
-The default configuration can be found in ./configs/default.yaml. A summary of some important configuration options are 
-provided below:
-- dataset
-  - dataset_path: Provide the path to downloaded dataset
-  - num_clips_per_vid: Number of random clips to extract and average during training time
-  - zoom_aug: Indicates whether augmentation is used during training
-- train
-  - criteria
-    - classification
-      - lambda: Indicates the weight given to classification loss during training
-    - sparsity
-      - node_lambda: Indicates the weight given to node sparsity loss during training
-      - edge_lambda: Indicates the weight given to edge sparsity loss during training
-- model
-  - checkpoint_path: path to saved model to use for inference
-  - pretrained_path: path to pretrained model
