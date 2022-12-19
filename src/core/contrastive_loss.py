@@ -94,8 +94,7 @@ class ContrastiveLoss(nn.Module):
                     target_idx=adj_es_emb_idx)
 
                 d_negative = self.calculate_distance(anchor=embeddings[i * num_clips_per_video + j, ed_embedding_col],
-                                                     target=embeddings[i * num_clips_per_video + j, es_embedding_col],
-                                                     custom_margin=custom_margin)
+                                                     target=embeddings[i * num_clips_per_video + j, es_embedding_col])
 
                 # d_positive / 2 since it is being added from 2 sources as opposed to d_negative
                 loss += torch.clamp(custom_margin + d_positive - d_negative, min=0.0).mean()
