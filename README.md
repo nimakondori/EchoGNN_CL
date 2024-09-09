@@ -16,7 +16,7 @@ The original EchoGNN by Masoud Mokhtari et al. can be found [here](https://githu
 The contrastive loss we implement aims to repel and distance dissimilar frames (ED and ES) in the resultant embedding space, while clustering together frames around the labeled ED and ES (neighbors).
 
 <p align="center">
-  <img alt="Contrastive loss illustration" src="./CL_Illustration.png" width="700"/>
+  <img alt="Contrastive loss illustration" src="./CL_illustration.png" width="700"/>
 </p>
 
 The loss function is as follows:
